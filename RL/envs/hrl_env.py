@@ -7,40 +7,32 @@ from gym.utils import seeding
 import spec_tools.spec_tools as st
 
 
-class SetDown_gym(gym.Env):
+class HRL_gym(gym.Env):
 
 	def __init__(self):
-		# self.init_h_s_ct = 10
-		# self.init_hoist_len = 3
-		self.init_h_s_ct = 5
-		self.init_hoist_len = 4
+		self.init_h_s_ct = 10
+		self.init_hoist_len = 3
 		self.cur_limit = None
-		self.init_limit = self.init_h_s_ct - self.init_hoist_len + 1.5
-		# self.init_limit = self.init_h_s_ct - self.init_hoist_len + 5
-		# self.init_limit = self.init_h_s_ct - self.init_hoist_len + 10
-
-		self.limit_decay = 0.998
+		self.init_limit = self.init_h_s_ct - self.init_hoist_len + 5
+		self.limit_decay = 0.99
 		self.limit_min = 3
 
-		self.lowering_speed = 12 / 60
-		self.lifting_speed = 12 / 60
-		self.num_action = 11
 		self.dt = 0.2
-		self.timeout = 200
-		self.hit_steps = 5
+		self.timeout = 600
+		self.hit_steps = 5 # visualize touching
 
 		self.num_step = int(np.ceil(self.timeout / self.dt)) + 1
 		self.cur_step = None
 		self.t = None
 
-		self.holding_length = 0 # skip 5 frames per action
+		self.holding_length = 1 # skip 5 frames per action
 		self.holding_step = max(1, int(self.holding_length / self.dt))
 
 		self.seed()
 
 		self.obs_len = 0.2
 		self.initial_waiting_steps = int(self.obs_len / self.dt) # waiting time for the first observation
-		self.pred_len = 2
+		self.pred_len = 0.2
 		self.predicting_steps = int(self.pred_len / self.dt)
 
 		self.rel_motion_sc = None
@@ -59,7 +51,7 @@ class SetDown_gym(gym.Env):
 		# 	2 * (int(self.obs_len / self.dt) + int(self.pred_len / self.dt)))
 		self.high_limit = (self.init_h_s_ct - self.init_hoist_len + 10) * np.ones(
 			1 * (int(self.obs_len / self.dt) + int(self.pred_len / self.dt)))
-		self.action_space = spaces.Discrete(self.num_action)
+		self.action_space = spaces.Discrete(13)
 		self.observation_space = spaces.Box(-self.high_limit, high=self.high_limit, dtype=np.float16)
 		self.state = np.zeros([self.high_limit.shape[0]])
 		self.sum_reward = 0
@@ -110,18 +102,19 @@ class SetDown_gym(gym.Env):
 		if gameover:
 			if self.cur_step < self.num_step and self.cur_d_sb < 0: # set-down
 				vel = (self.prev_d_sb - self.cur_d_sb)/self.dt
-				print(vel)
 				if 0 < vel < 0.3: # good one
 					reward = 10*1/vel
+					print(vel)
 					self.final_imp_vel = vel
 				else: # bad one
-					# reward = -30
-					reward = 0
+					reward = -10
+					print(vel)
+					# reward = 0
 			if self.cur_d_sb > self.cur_limit: # hit boundary
 				reward = -30
 
 		if not gameover:
-			reward = -0.01
+			reward = -0.1
 		self.sum_reward += reward
 
 		return reward
@@ -156,8 +149,8 @@ class SetDown_gym(gym.Env):
 			# else:
 			# 	pass
 
-			speed = (action-int((self.num_action-1)/2))/30
-			hoist_len = max(hoist_len + speed * self.dt, 0)
+			speed = (action-6)/30
+			hoist_len = max(hoist_len + speed * self.dt,0)
 
 			self.cur_hoist_length = hoist_len
 
@@ -243,4 +236,3 @@ class SetDown_gym(gym.Env):
 	def load_file(self, file_dir):
 		data_log = np.loadtxt(file_dir, delimiter=',')
 		return data_log
-

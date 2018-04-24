@@ -40,18 +40,28 @@ model_dir = "model/o%d_p%d_d%.1f_f%.1f-%.1f/" % (obs_len, pred_len, dt, high_pas
 np.random.seed(10)
 obs_len = 600
 pred_len = 20
-tol_len = 5000000
+tol_len = 500000
+
+
+# 3, 8 cut
+# 1.5,15
+# 3,5
+
 
 hs = 3
-tp = 15
+tp = 5
 
 resp = st.Spectrum.from_synthetic(spreading=None, Hs=hs, Tp=tp)
-# resp.low_pass_FreqFilter(1.1)
+# resp.plot()
+# resp.low_pass_FreqFilter(1.0)
 # resp.high_pass_FreqFilter(0.6)
-resp.plot()
 
 
 rel_motion_sc_t, data = resp.make_time_trace(tol_len, dt)
+
+t = np.loadtxt('modeltestenv3.txt')
+# data = np.array(t[:,1]).reshape(1,len(t[:,1]),1)
+
 
 data = data.reshape(1,tol_len,1)
 
@@ -66,6 +76,7 @@ MLP = toolkit.loadModel('model/mlp/', 'exp1')
 
 f = plt.figure()
 lim = (-hs*3/4,hs*3/4)
+# lim = (-0.15,0.15)
 ax1 = f.add_subplot(3, 1, 1)
 ax1.set_ylim(lim)
 
@@ -81,10 +92,6 @@ ax3.set_xticks([0, obs_len-1, obs_len+pred_len], minor=False)
 ax1.xaxis.grid(True, which='major')
 ax2.xaxis.grid(True, which='major')
 ax3.xaxis.grid(True, which='major')
-
-# ax1.set_ylabel('real_wave',  fontsize=15)
-# ax3.set_xlabel('time_step(dt=0.2s)', fontsize=15)
-# ax2.set_ylabel('predicted_wave', fontsize=15)
 
 ax1.set_ylabel('LSTM',  fontsize=15)
 ax2.set_ylabel('MLP', fontsize=15)
@@ -104,14 +111,12 @@ def getPred(input_seq, mode="LSTM"):
 		pred = toolkit.fourierExtrapolation(input_seq[:,0:obs_len,:], pred_len).reshape(pred_len,1)
 
 	if mode == "AR":
-		pred = toolkit.computeAR(input_seq[:,0:obs_len,:], pred_len).reshape(pred_len,1)
+		pred = toolkit.computeAR(input_seq[:,0:obs_len,:], pred_len, lag=14).reshape(pred_len,1)
 
 	return np.concatenate((input_seq[0][0:obs_len], pred), axis=0)[start_show:]
 
 
 x = np.arange(start_show, obs_len + pred_len, 1)
-# line1, = ax1.plot(x, data[0][x], 'b')
-# line2, = ax2.plot(x, getPred(data[:, 0:obs_len+pred_len, :],mode=mode), 'r')
 
 line1 = []
 line1.extend(ax1.plot(x, data[0][x], 'b'))
@@ -179,10 +184,6 @@ def animate(i):
 	ax2.set_title("step: %d, mean_mae: %.3f, mean_r2: %.3f" % (len(err_tol2), np.mean(np.array(err_tol2)),np.mean(np.array(fit_tol2))), color='g', fontsize=15)
 	ax3.set_title("step: %d, mean_mae: %.3f, mean_r2: %.3f" % (len(err_tol3), np.mean(np.array(err_tol3)),np.mean(np.array(fit_tol3))), color='g', fontsize=15)
 
-	# if err < 0.15:
-	# 	ax1.set_title("step: %d, RMSE for %ds: %.3f, r2: %.3f, mean_rmse: %.3f, mean_r2: %.3f" % (len(err_tol),pred_len*dt, err, fit, np.mean(np.array(err_tol)),np.mean(np.array(fit_tol))), color='g', fontsize=15)
-	# else:
-	# 	ax1.set_title("step: %d, RMSE for %ds: %.3f, r2: %.3f, mean_rmse: %.3f, mean_r2: %.3f" % (len(err_tol),pred_len*dt,err, fit, np.mean(np.array(err_tol)),np.mean(np.array(fit_tol))), color='black', fontsize=15)
 	return line1, line2, line3,
 
 

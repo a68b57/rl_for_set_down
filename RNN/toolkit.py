@@ -9,13 +9,14 @@ import matplotlib.gridspec as gridspec
 import tensorflow as tf
 from numpy import fft
 from statsmodels.tsa.ar_model import AR
+from statsmodels.tsa.stattools import adfuller, acf, pacf
 
 
 graph = tf.get_default_graph()
 
 
 def loadModel(model_dir, model_name):
-	json_file = open(model_dir + model_name+'.json', 'r')
+	json_file = open(model_dir + model_name + '.json', 'r')
 	loaded_model_json = json_file.read()
 	json_file.close()
 	loaded_model = model_from_json(loaded_model_json)
@@ -27,14 +28,15 @@ def saveModel(model_dir, model_name, model):
 	model_json = model.to_json()
 	with open(model_dir + model_name + ".json", "w") as json:
 		json.write(model_json)
-	model.save_weights(model_dir + model_name +".h5")
+	model.save_weights(model_dir + model_name + ".h5")
 
 
 def addDim(data):
 	return np.expand_dims(data, axis=2)
 
 
-def prepareSplitDataSet(data_dir, test_size = 0.2, filename_pred_len=50, filename_obs_len=1000, pred_len=50, obs_len = 1000):
+def prepareSplitDataSet(data_dir, test_size=0.2, filename_pred_len=50, filename_obs_len=1000, pred_len=50,
+                        obs_len=1000):
 	x = []
 	y = []
 	for file in sorted(glob.glob(data_dir + "X_o{}_p{}*.mat".format(filename_obs_len, filename_pred_len))):
@@ -48,9 +50,9 @@ def prepareSplitDataSet(data_dir, test_size = 0.2, filename_pred_len=50, filenam
 			y_data = loadmat(y_file)
 			y.extend([y_data['Y']])
 	x = np.array(x)
-	x = np.transpose(x, axes=(0,2,1))
+	x = np.transpose(x, axes=(0, 2, 1))
 	x = np.concatenate(x, axis=0)
-	y = np.concatenate(np.transpose(np.array(y),axes=(0,2,1)), axis=0)
+	y = np.concatenate(np.transpose(np.array(y), axes=(0, 2, 1)), axis=0)
 
 	x_train, x_test, y_train, y_test = model_selection.train_test_split(x, y, test_size=test_size)
 	x_train = x_train[:, -obs_len:]
@@ -133,7 +135,7 @@ def makeSubplots(num_plot=6, decoded=None, target=None):
 					ax.plot(sel_dec[i])
 					ax.set_title('predicted')
 				if j == 1:
-					ax.plot(sel_tar[i],'r')
+					ax.plot(sel_tar[i], 'r')
 					ax.set_title('target')
 				if j == 2:
 					ax.plot(sel_dec[i])
@@ -152,34 +154,33 @@ def makeSubplots(num_plot=6, decoded=None, target=None):
 	return plt
 
 
-def evaPred(model_dir=None, decoded=None, target=None, save_pred=False, save_plot = False, plot=True):
-
+def evaPred(model_dir=None, decoded=None, target=None, save_pred=False, save_plot=False, plot=True):
 	pred_dir = model_dir + 'prediction/'
 	fig_dir = model_dir + 'figures/'
 	time_str = time.strftime("_%H%M%S")
 	if not os.path.exists(pred_dir):
 		os.makedirs(pred_dir)
 
-	fig = makeSubplots(decoded=decoded,target=target)
+	fig = makeSubplots(decoded=decoded, target=target)
 
 	if save_plot:
 		if not os.path.exists(fig_dir):
 			os.makedirs(fig_dir)
-		fig.savefig(fig_dir+'random_testing_samples'+ time_str +'.png')
+		fig.savefig(fig_dir + 'random_testing_samples' + time_str + '.png')
 
 	if save_pred and target is not None:
-		np.savetxt(pred_dir + 'predicted_'+ time_str+'.csv', decoded, delimiter=",")
+		np.savetxt(pred_dir + 'predicted_' + time_str + '.csv', decoded, delimiter=",")
 		np.savetxt(pred_dir + 'target_' + time_str + '.csv', target, delimiter=",")
 
 	elif save_pred and target is None:
-		np.savetxt(pred_dir + 'deploy_predicted_'+ time_str+'.csv', decoded, delimiter=",")
+		np.savetxt(pred_dir + 'deploy_predicted_' + time_str + '.csv', decoded, delimiter=",")
 
 	if plot:
 		fig.show()
 
 
 def fourierExtrapolation(x, n_predict):
-	x = np.array(x).reshape(x.size,)
+	x = np.array(x).reshape(x.size, )
 	n = x.size
 	n_harm = 40
 	t = np.arange(0, n)
@@ -198,17 +199,19 @@ def fourierExtrapolation(x, n_predict):
 		ampli = np.absolute(x_freqdom[i]) / n   # amplitude
 		phase = np.angle(x_freqdom[i])          # phase
 		restored_sig += ampli * np.cos(2 * np.pi * f[i] * t + phase)
-	output = restored_sig + p[0]*t
+	output = restored_sig + p[0] * t
 	# output = restored_sig
 
 	return output
-	# return output.reshape(output.size, 1)[-n_predict:]
 
 
-def goodnessOfFit(pred,gt):
-	de = np.sqrt(np.sum((pred-gt)**2))
-	no = np.sqrt(np.sum(gt**2))
-	fit = 100*(1 - de/no)
+# return output.reshape(output.size, 1)[-n_predict:]
+
+
+def goodnessOfFit(pred, gt):
+	de = np.sqrt(np.sum((pred - gt) ** 2))
+	no = np.sqrt(np.sum(gt ** 2))
+	fit = 100 * (1 - de / no)
 	return fit
 
 
@@ -221,17 +224,33 @@ def makeMatSubset(mat_file, num_sample):
 	subset = data[:, idx]
 	dict['X'] = subset
 	file_name = os.path.basename(mat_file)
-	file_name = os.path.splitext(file_name)[0]+'_small'
-	savemat(dir+'/'+file_name, dict, oned_as='row')
+	file_name = os.path.splitext(file_name)[0] + '_small'
+	savemat(dir + '/' + file_name, dict, oned_as='row')
 
 
-def computeAR(data, pred_len, mode="same"):
+def running_mean(x, N):
+	cumsum = np.cumsum(np.insert(x, 0, 0))
+	return (cumsum[N:] - cumsum[:-N]) / float(N)
+
+
+def computeAR(data, pred_len, lag=15, mode="same"):
 	data = data[0]
+	# averaged = np.concatenate((data[0:2,0],running_mean(data,5)))
+	# acf_1 = acf(averaged, nlags=300)
+	# pacf_1 = pacf(averaged, nlags=300)
+
+	# plt.figure(2)
+	# plt.plot(acf_1)
+	# plt.show()
+
+	# plt.figure(3)
+	# plt.plot(pacf_1)
+	# plt.show()
+
 	if mode == "same":
 		model = AR(endog=data)
-		model_fit = model.fit(maxlag=14, disp=False, ic='aic')
-		y = model_fit.predict(start=len(data), end=len(data)+pred_len-1, dynamic=False)
-
+		model_fit = model.fit(maxlag=lag, disp=False, ic='aic')
+		y = model_fit.predict(start=len(data), end=len(data) + pred_len - 1, dynamic=False)
 	else:
 		y = []
 		for i in range(pred_len):
@@ -253,6 +272,3 @@ def pointWiseMLP(model, data, pred_len):
 		data = np.hstack((data, y))
 		pred.append(y[0])
 	return np.array(pred)
-
-
-

@@ -21,7 +21,7 @@ ENV_NAME = 'SetDown-v1'
 model_dir = '/home/michael/Desktop/workspace/rl_for_set_down/RL/model/exp22/'
 log_dir = '/home/michael/Desktop/workspace/rl_for_set_down/RL/log/exp22/'
 
-exp_name = '23.8.2'
+exp_name = '23.8'
 
 if __name__ == "__main__":
 	env = gym.make(ENV_NAME)
@@ -38,7 +38,7 @@ if __name__ == "__main__":
 	print(model.summary())
 
 	memory = SequentialMemory(limit=5000, window_length=1)
-	policy = LinearAnnealedPolicy(EpsGreedyQPolicy(), attr='eps', value_max=0.5, value_min=0.1, value_test=.0,
+	policy = LinearAnnealedPolicy(EpsGreedyQPolicy(), attr='eps', value_max=0.5, value_min=0.1, value_test=0,
 	                              nb_steps=10000)
 
 	dqn = DQNAgent(model=model, nb_actions=nb_actions, memory=memory, nb_steps_warmup=10,
@@ -46,7 +46,7 @@ if __name__ == "__main__":
 
 	dqn.compile(SGD(lr=1e-3), metrics=['mse'])
 
-	dqn.load_weights(model_dir + 'following_'+exp_name+'_weights_1100000.h5f')
+	dqn.load_weights(model_dir + 'following_'+'23.1'+'_weights_1300000.h5f')
 
 	# weights_filename = model_dir + 'following_{}_weights.h5f'.format(exp_name)
 	# checkpoint_weights_filename = model_dir + 'following_' + exp_name + '_weights_{step}.h5f'

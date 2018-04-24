@@ -22,3 +22,9 @@ register(
     id='Following-v1',
     entry_point='RL.envs:Following_gym',
 )
+
+
+register(
+    id='HRL-v0',
+    entry_point='RL.envs:HRL_gym',
+)
