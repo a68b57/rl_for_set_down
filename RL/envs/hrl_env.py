@@ -9,53 +9,69 @@ import spec_tools.spec_tools as st
 
 class HRL_gym(gym.Env):
 
-	def __init__(self):
-		self.init_h_s_ct = 10
-		self.init_hoist_len = 3
+	def __init__(self, init_barge_ct, init_hoist_len, limit_decay, limit_min, dt, eps_timeout, goal_timeout, obs_len,
+	             pred_len, hs, tp, num_actions, num_goals):
+
+		# geometry
+		self.init_h_s_ct = init_barge_ct
+		self.init_hoist_len = init_hoist_len
 		self.cur_limit = None
 		self.init_limit = self.init_h_s_ct - self.init_hoist_len + 5
-		self.limit_decay = 0.99
-		self.limit_min = 3
-
-		self.dt = 0.2
-		self.timeout = 600
-		self.hit_steps = 5 # visualize touching
-
-		self.num_step = int(np.ceil(self.timeout / self.dt)) + 1
-		self.cur_step = None
-		self.t = None
-
-		self.holding_length = 1 # skip 5 frames per action
-		self.holding_step = max(1, int(self.holding_length / self.dt))
-
-		self.seed()
-
-		self.obs_len = 0.2
-		self.initial_waiting_steps = int(self.obs_len / self.dt) # waiting time for the first observation
-		self.pred_len = 0.2
-		self.predicting_steps = int(self.pred_len / self.dt)
-
-		self.rel_motion_sc = None
-		self.rel_motion_sc_t = None
-
-		self.resp = st.Spectrum.from_synthetic(spreading=None, Hs=1.5, Tp=15)
-		self.rel_motion_sc_t, self.rel_motion_sc = self.resp.make_time_trace(self.num_step + 200, self.dt)
-		# self.rel_motion_sc = self.load_file('/home/michael/Desktop/workspace/rl_for_set_down/RL/log/' + 'training_motion_exp18.csv')
+		self.limit_decay = limit_decay
+		self.limit_min = limit_min
 
 		self.cur_d_sb = None # current distance between supply boat and block (margin for the right)
 		self.cur_d_blimit = None # margin to the left
 		self.prev_d_sb = None
 		self.cur_hoist_length = None
+		self.final_imp_vel = 0
 
-		# self.high_limit = (self.init_h_s_ct - self.init_hoist_len + 10) * np.ones(
-		# 	2 * (int(self.obs_len / self.dt) + int(self.pred_len / self.dt)))
+		# timing meta-controller
+		self.dt = dt
+		self.hit_steps = 5 # visualize last n steps before touching
+		self.max_eps_num_step = int(np.ceil(eps_timeout / self.dt)) + 1
+		self.max_goal_num_step = int(np.ceil(goal_timeout / self.dt)) + 1
+		self.cur_step = None
+		self.t = None
+
+		# param meta-controller
+		self.num_goals = num_goals
+		self.num_survival_modes = (self.num_goals-1)//2
+		self.eps_completed = None
+		self.eps_over = None
+		self.goal_space = spaces.Discrete(num_goals)
+		self.goal = None # one-hot format
+
+		# timing controller
+		self.goal_t = None
+		self.goal_cur_step = None
+		self.goal_total_step = None
+
+		self.holding_length = 0 # skip 5 frames per action
+		self.holding_step = max(1, int(self.holding_length / self.dt))
+		self.seed()
+
+		# param controller
+		self.num_actions = num_actions
+		self.action_space = spaces.Discrete(num_actions)
+		self.goal_completed = None
+		self.goal_over = None
+
+		# states
+		self.obs_len = obs_len
+		self.initial_waiting_steps = int(self.obs_len / self.dt) # waiting time for the first observation
+		self.pred_len = pred_len
+		self.predicting_steps = int(self.pred_len / self.dt)
 		self.high_limit = (self.init_h_s_ct - self.init_hoist_len + 10) * np.ones(
-			1 * (int(self.obs_len / self.dt) + int(self.pred_len / self.dt)))
-		self.action_space = spaces.Discrete(13)
+			2 * (int(self.obs_len / self.dt) + int(self.pred_len / self.dt)))
 		self.observation_space = spaces.Box(-self.high_limit, high=self.high_limit, dtype=np.float16)
 		self.state = np.zeros([self.high_limit.shape[0]])
-		self.sum_reward = 0
 
+		# wave and motion
+		self.resp = st.Spectrum.from_synthetic(spreading=None, Hs=hs, Tp=tp)
+		self.rel_motion_sc_t, self.rel_motion_sc = self.resp.make_time_trace(self.max_eps_num_step + 200, self.dt)
+
+		# logging
 		self.hoist_len_track = []
 		self.d_sb_track = []
 		self.d_blimit_track = []
@@ -65,102 +81,181 @@ class HRL_gym(gym.Env):
 		return [seed]
 
 	def reset(self):
+		# logging
 		self.hoist_len_track = []
 		self.d_sb_track = []
 		self.d_blimit_track = []
+
+		# timing meta-controller
 		self.t = 0
 		self.cur_step = 0
+
+		# geometry
 		self.cur_d_sb = self.init_h_s_ct - self.init_hoist_len
 		self.cur_d_blimit = self.init_limit - self.cur_d_sb
 		self.prev_d_sb = self.cur_d_sb
 		self.cur_hoist_length = self.init_hoist_len
-		self.final_imp_vel = 0
-		self.sum_reward = 0
 		self.cur_limit = self.init_limit
+		self.final_imp_vel = 0
 
-		self.rel_motion_sc_t, self.rel_motion_sc = self.resp.make_time_trace(self.num_step + 200, self.dt)
+		# wave and motion
+		self.rel_motion_sc_t, self.rel_motion_sc = self.resp.make_time_trace(self.max_eps_num_step + 200, self.dt)
 		cur_motion_s = self.rel_motion_sc[self.initial_waiting_steps-1:self.predicting_steps]
 
+		# states
 		# first two elements are margin to right and left
 		self.state[self.initial_waiting_steps - 1] = self.cur_d_sb
-		# self.state[self.initial_waiting_steps] = self.cur_d_blimit
-
+		self.state[self.initial_waiting_steps] = self.cur_d_blimit
 		#prediction of right margin
-		# self.state[self.initial_waiting_steps + 1:self.predicting_steps + 2] = self.cur_d_sb - (self.rel_motion_sc[1:self.predicting_steps+1]-cur_motion_s)
-		self.state[self.initial_waiting_steps:self.predicting_steps+1] = self.cur_d_sb + (self.rel_motion_sc[0]-cur_motion_s)
-
+		self.state[self.initial_waiting_steps + 1:self.predicting_steps + 2] = self.cur_d_sb - (self.rel_motion_sc[1:self.predicting_steps+1]-cur_motion_s)
 		#prediction of left margin
-		# self.state[self.predicting_steps + 2:] = self.cur_d_blimit + (self.rel_motion_sc[1:self.predicting_steps+1]-cur_motion_s)
-		# self.state[self.predicting_steps + 1:] = self.cur_d_blimit + (self.rel_motion_sc[1:self.predicting_steps+1]-cur_motion_s)
-
+		self.state[self.predicting_steps + 2:] = self.cur_d_blimit + (self.rel_motion_sc[1:self.predicting_steps+1]-cur_motion_s)
 		self.state = np.reshape(self.state, [self.state.shape[0], ])
+
+		# controllers param
+		self.goal_completed = False
+		self.eps_completed = False
+		self.goal_over = False
+		self.eps_over = False
+
 		return np.array(self.state)
 
-	def get_reward(self, gameover):
-		reward = 0
+	def goal_int(self):
+		"""convert from one_hot to int"""
+		return np.argmax(self.goal)
 
-		if gameover:
-			if self.cur_step < self.num_step and self.cur_d_sb < 0: # set-down
-				vel = (self.prev_d_sb - self.cur_d_sb)/self.dt
+	def intp_goal(self):
+		"""translate goal int to survival time"""
+		max_t = (self.num_goals - 1) // 2
+		if self.goal_int() != self.num_goals - 1:
+			time = self.goal_int() % max_t + 1
+			return time * self.dt
+		else:
+			return False
+
+	def get_intrinsic_reward(self):
+		"""
+			intrinsic step reward of controller on games
+			full-speed-down; following; set-down
+		"""
+		reward = 0
+		goal_int = self.goal_int()
+		if self.intp_goal():
+			if goal_int < self.num_survival_modes:
+				# full-speed down game
+				if not self.goal_completed:
+					reward = min(0.5 * 1 / np.abs(self.cur_d_sb), 10)
+				if self.goal_over:
+					reward = -100
+			else:
+				# following game
+				if not self.goal_completed:
+					reward = min(0.1*2/ np.abs(self.cur_d_sb-self.cur_d_blimit), 10)
+				if self.goal_over:
+					reward = -100
+		else:
+			# set-down game
+			if self.goal_completed:
+				vel = (self.prev_d_sb - self.cur_d_sb) / self.dt
 				if 0 < vel < 0.3: # good one
 					reward = 10*1/vel
 					print(vel)
 					self.final_imp_vel = vel
-				else: # bad one
-					reward = -10
-					print(vel)
-					# reward = 0
-			if self.cur_d_sb > self.cur_limit: # hit boundary
+				else:
+					reward = -30
+			if self.goal_over:
 				reward = -30
-
-		if not gameover:
-			reward = -0.1
-		self.sum_reward += reward
-
 		return reward
 
-	def if_gameover(self):
+	def get_extrinsic_reward(self):
+		"""
+			extrinsic step reward of meta-controller
+			for completing goals and have imp_vel(identical to intrinsic reward)
+		"""
+		reward = 0
+		if not self.intp_goal():
+			reward = self.get_intrinsic_reward()
+		if self.goal_completed:
+			reward += 1
+		return reward
 
-		gameover = False
+	# goal is over if agent hit walls or exceeds goal timeout
+	def is_goal_over(self):
+		"""goal is over either timeout for set-down or touch limits for following and full-speed down"""
+		goal_over = False
+		if self.intp_goal():
+			# for following and full speed down
+			if self.cur_d_sb >= self.cur_d_blimit or self.cur_d_sb < 0:
+				goal_over = True
+		if not self.intp_goal():
+			# for set-down
+			if self.cur_step >= self.max_goal_num_step:
+				goal_over = True
+		self.goal_over = goal_over
 
-		if self.cur_d_sb < 0 or self.cur_step == self.num_step or self.cur_d_sb > self.cur_limit:
-			gameover = True
-		return gameover
+	# eps is over as soon as goal is over
+	def is_eps_over(self):
+		"""episode is over then goal is over or episode step meets timeout"""
+		eps_over = False
+		if self.cur_step == self.max_eps_num_step or self.goal_over:
+			eps_over = True
+		self.eps_over = eps_over
+
+	# goal is reached either meet survival time or set-down
+	def is_goal_completed(self):
+		"""goal is completed when goal step meets required survival time or set-down"""
+		goal_reached = False
+		goal_steps = self.intp_goal()
+		if goal_steps:
+			if self.goal_cur_step == goal_steps:
+				goal_reached = True
+		if not goal_steps:
+			if self.cur_d_sb < 0:
+				goal_reached = True
+		self.goal_completed = goal_reached
+
+	def is_eps_completed(self):
+		"""eps is completed only when set-down"""
+		eps_completed = False
+		if self.cur_d_sb < 0 and not self.eps_over:
+			eps_completed = True
+		self.eps_completed = eps_completed
+
+	def update_status(self):
+		self.is_goal_over()
+		self.is_goal_completed()
+		self.is_eps_over()
+		self.is_eps_completed()
+
+	def set_goal(self, goal):
+		self.goal = goal
+		self.goal_total_step = self.intp_goal()
 
 	def step(self, action):
 		assert self.action_space.contains(action), "%r (%s) invalid" % (action, type(action))
 
 		d_sb = self.cur_d_sb
 		hoist_len = self.cur_hoist_length
-
 		self.prev_d_sb = d_sb
 
 		for k in range(self.holding_step):
-
+			# log geometry before action
 			self.hoist_len_track.append(hoist_len)
 			self.d_sb_track.append(d_sb)
 			self.d_blimit_track.append(self.cur_d_blimit)
 
-			# if action == 1: # right
-			# 	hoist_len = hoist_len + self.lowering_speed * self.dt
-			#
-			# elif action == 2: # left
-			# 	hoist_len = max(hoist_len - self.lifting_speed * self.dt, 0)
-			# else:
-			# 	pass
-
-			speed = (action-6)/30
-			hoist_len = max(hoist_len + speed * self.dt,0)
-
+			# compute geometry after taking action
+			speed = (action-(self.num_actions-1)//2)/30
+			hoist_len = max(hoist_len + speed * self.dt, 0)
 			self.cur_hoist_length = hoist_len
-
 			h_sc = self.init_h_s_ct - np.interp(self.t, self.rel_motion_sc_t, self.rel_motion_sc)
 			d_sb = h_sc - hoist_len
-
 			self.cur_d_sb = d_sb
 			self.cur_d_blimit = self.cur_limit - self.cur_d_sb
 
-			if self.if_gameover():
+			# update status
+			self.update_status()
+			if self.goal_completed or self.goal_over:
 				self.hoist_len_track.append(hoist_len)
 				self.d_sb_track.append(d_sb)
 				self.d_blimit_track.append(self.cur_d_blimit)
@@ -169,22 +264,27 @@ class HRL_gym(gym.Env):
 			self.cur_step += 1
 			self.t = round(self.cur_step * self.dt, 2)
 
+		# prepare the transition for return
+		# compute the next state after taking action at current state
 		pred = self.rel_motion_sc[self.cur_step:self.cur_step + self.predicting_steps+1]
 
+		# first and second elements are margins to both sides
 		self.state[self.initial_waiting_steps - 1] = self.cur_d_sb
-		# self.state[self.initial_waiting_steps] = self.cur_d_blimit
+		self.state[self.initial_waiting_steps] = self.cur_d_blimit
 
-		# self.state[2:self.predicting_steps + 2] = self.cur_d_sb - (pred-self.rel_motion_sc[self.cur_step:self.cur_step + self.predicting_steps])
-		self.state[self.initial_waiting_steps:self.predicting_steps+1] = self.cur_d_sb + (pred[0] - pred[1:])
+		# changes of both margins
+		self.state[self.initial_waiting_steps+1:self.predicting_steps+2] = self.cur_d_sb + (pred[0] - pred[1:])
+		self.state[self.predicting_steps + 2:] = self.cur_d_blimit + (pred-self.rel_motion_sc[self.cur_step:self.cur_step + self.predicting_steps])
 
-		# self.state[self.predicting_steps + 2:] = self.cur_d_blimit + (pred-self.rel_motion_sc[self.cur_step:self.cur_step + self.predicting_steps])
-
-		done = self.if_gameover()
-		reward = self.get_reward(done)
+		goal_over = self.goal_over
+		goal_completed = self.goal_completed
+		intrinsic_reward = self.get_intrinsic_reward()
 
 		if self.cur_limit > self.limit_min:
 			self.cur_limit *= self.limit_decay
-		return np.reshape(self.state, [self.state.shape[0], ]), reward, done, {}
+
+		# return transition
+		return np.reshape(self.state, [self.state.shape[0], ]), intrinsic_reward, (goal_completed,goal_over), {}
 
 	def plot(self, show_ani=False, show_motion=False):
 

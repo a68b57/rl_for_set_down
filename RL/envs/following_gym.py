@@ -115,8 +115,8 @@ class Following_gym(gym.Env):
 	def get_reward(self, gameover):
 		reward = 0
 		if not gameover:
-			reward = min(0.5*1 / np.abs(self.cur_d_sb), 10)
-			# reward = min(0.1*2/ np.abs(self.cur_d_sb-self.cur_d_blimit), 10)
+			# reward = min(0.5*1 / np.abs(self.cur_d_sb), 10)
+			reward = min(0.1*2/ np.abs(self.cur_d_sb-self.cur_d_blimit), 10)
 		if gameover and self.cur_step < self.num_step:
 			reward = -100
 		self.sum_reward += reward
