@@ -276,15 +276,14 @@ class HRL_gym(gym.Env):
 		self.state[self.initial_waiting_steps+1:self.predicting_steps+2] = self.cur_d_sb + (pred[0] - pred[1:])
 		self.state[self.predicting_steps + 2:] = self.cur_d_blimit + (pred-self.rel_motion_sc[self.cur_step:self.cur_step + self.predicting_steps])
 
-		goal_over = self.goal_over
-		goal_completed = self.goal_completed
 		intrinsic_reward = self.get_intrinsic_reward()
 
 		if self.cur_limit > self.limit_min:
 			self.cur_limit *= self.limit_decay
 
 		# return transition
-		return np.reshape(self.state, [self.state.shape[0], ]), intrinsic_reward, (goal_completed,goal_over), {}
+		return np.reshape(self.state, [self.state.shape[0], ]), intrinsic_reward, self.goal_completed, \
+		       self.goal_over, self.eps_completed, self.eps_over
 
 	def plot(self, show_ani=False, show_motion=False):
 
