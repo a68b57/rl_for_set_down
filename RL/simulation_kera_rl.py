@@ -14,6 +14,7 @@ from rl.memory import SequentialMemory
 from rl.callbacks import FileLogger, ModelIntervalCheckpoint, TestLogger
 
 
+
 ENV_NAME = 'SetDown-v1'
 # ENV_NAME = 'Following-v1'
 

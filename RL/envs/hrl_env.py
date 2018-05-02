@@ -65,7 +65,7 @@ class HRL_gym(gym.Env):
 		self.high_limit = (self.init_h_s_ct - self.init_hoist_len + 10) * np.ones(
 			2 * (int(self.obs_len / self.dt) + int(self.pred_len / self.dt)))
 		self.observation_space = spaces.Box(-self.high_limit, high=self.high_limit, dtype=np.float16)
-		self.state = np.zeros([self.high_limit.shape[0]])
+		self.state = np.zeros([1, self.high_limit.shape[0]])
 
 		# wave and motion
 		self.resp = st.Spectrum.from_synthetic(spreading=None, Hs=hs, Tp=tp)
@@ -110,7 +110,9 @@ class HRL_gym(gym.Env):
 		self.state[self.initial_waiting_steps + 1:self.predicting_steps + 2] = self.cur_d_sb - (self.rel_motion_sc[1:self.predicting_steps+1]-cur_motion_s)
 		#prediction of left margin
 		self.state[self.predicting_steps + 2:] = self.cur_d_blimit + (self.rel_motion_sc[1:self.predicting_steps+1]-cur_motion_s)
-		self.state = np.reshape(self.state, [self.state.shape[0], ])
+		# self.state = np.reshape(self.state, [self.state.shape[0], ])
+		self.state = np.reshape(self.state, [1, self.state.shape[0]])
+
 
 		# controllers param
 		self.goal_completed = False
