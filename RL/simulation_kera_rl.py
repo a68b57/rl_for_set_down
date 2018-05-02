@@ -18,8 +18,8 @@ ENV_NAME = 'SetDown-v1'
 # ENV_NAME = 'Following-v1'
 
 
-model_dir = '/home/michael/Desktop/workspace/rl_for_set_down/RL/model/exp22/'
-log_dir = '/home/michael/Desktop/workspace/rl_for_set_down/RL/log/exp22/'
+model_dir = './model/exp22/'
+log_dir = './log/exp22/'
 
 exp_name = '23.8'
 
