@@ -44,16 +44,14 @@ NUM_EPISODES = 100000
 REPLAY_BUFFER_SIZE = 15000
 BATCH_SIZE = 32
 TARGET_UPDATE_FREQ = 1000
-NUM_BURNIN = 1000
+NUM_BURNIN = 100
 ANNEAL_NUM_STEPS = 5000
 EVAL_FREQ = 1000
-
-
 
 # env parameters
 INIT_BARGE_CT = 10
 INIT_HOIST_LEN = 3
-LIMIT_DECAY = 0.98
+LIMIT_DECAY = 0.998
 LIMIT_MIN = 3
 DT = 0.2
 EPS_TIMEOUT = 200 # in second
@@ -71,7 +69,6 @@ EVAL_NUM_EPISODES = 10
 
 
 def main():
-
 	env = HRL_gym(init_barge_ct=INIT_BARGE_CT,init_hoist_len=INIT_HOIST_LEN,limit_decay=LIMIT_DECAY,
 	              limit_min=LIMIT_MIN,dt=DT,eps_timeout=EPS_TIMEOUT,goal_timeout=GOAL_TIMEOUT,obs_len=OBS_LEN,
 	              pred_len=PRED_LEN,hs=HS,tp=TP,num_actions=NUM_ACTIONS,num_goals=NUM_GOALS)
@@ -80,7 +77,7 @@ def main():
 		# metacontroller_network_type='Linear',
 		controller_network_type='Deep',
 		metacontroller_network_type='Deep',
-		state_shape=(1, env.state.shape[0]),
+		state_shape=(1, env.state.shape[1]),
 		goal_shape=(1, NUM_GOALS),
 		num_actions=NUM_ACTIONS,
 		num_goals=NUM_GOALS,

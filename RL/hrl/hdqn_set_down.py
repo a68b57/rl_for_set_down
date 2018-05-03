@@ -226,7 +226,7 @@ class HQNAgent:
 			--------
 			selected choice (goal or action)
 			"""
-			policy_args = inspect.signature(policy.select)[0]
+			policy_args = inspect.getargspec(policy.select)[0]
 			# print 'Policy args'
 			# print policy_args
 
@@ -435,11 +435,12 @@ class HQNAgent:
 
 		print('Start Burn-in')
 		for episode_idx in range(num_episodes):
+			# episode level
 			# start new episode
+			selected_goal = []
 
 			# get initial state
 			state = env.reset()
-
 			if DEBUG:
 				print('Burnin New Episode {0}'.format(episode_idx))
 				print('Initial State {0}'.format(state))
@@ -447,14 +448,19 @@ class HQNAgent:
 			# select next goal
 			goal = self.metacontroller.select(self.metacontroller.burnin_policy)
 			proc_goal = self.goal_preprocess(goal)
+			setattr(env, 'goal', proc_goal)
+
+			selected_goal.append(goal)
+			total_extrin_eps = 0
 
 			# new episode, completing the goal
 			while True:
+				# goal level
 
 				# the first state of the new goal
 				state0 = state
+
 				# the total environmental reward achieved by setting this goal
-				intrinsic_reward = 0
 				extrinsic_reward = 0
 
 				# new goal
@@ -463,6 +469,7 @@ class HQNAgent:
 
 				# goal has not been reached and the episode has not finished
 				while True:
+					# action level
 
 					# select next action given the current goal
 					action = self.controller.select(self.controller.burnin_policy)
@@ -475,19 +482,17 @@ class HQNAgent:
 						action)
 
 					# compute the internal and external reward
-					intrinsic_reward += in_reward
 					extrinsic_reward += env.get_extrinsic_reward()
 					if DEBUG:
 						print(
 							'Next state {0} {1} : Goal {2} {3} Intrinsic Reward {4} Extrinsic Reward {5} Action{6}'.format(
-								next_state, next_state, proc_goal, goal, intrinsic_reward, extrinsic_reward,
+								next_state, next_state, proc_goal, goal, in_reward, extrinsic_reward,
 								action))
 
 					# store the experience in the controller's memory
-					# self.controller.num_samples+=1
 					self.controller.memory.append([state, proc_goal],
 					                              action,
-					                              intrinsic_reward,
+					                              in_reward,
 					                              [next_state, proc_goal],
 					                              is_goal_completed or is_goal_over)
 
@@ -498,16 +503,21 @@ class HQNAgent:
 						break
 
 				# store the experience in the metacontroller's memory
-				# self.metacontroller.num_samples+=1
 				self.metacontroller.memory.append([state0],
 				                                  goal,
 				                                  extrinsic_reward,
 				                                  [next_state],
 				                                  is_eps_completed or is_eps_over)
+
+				total_extrin_eps += extrinsic_reward
+
 				if is_eps_over or is_eps_completed:
 					# start new episode
 					if DEBUG:
 						print('Start new episode {0}'.format(episode_idx))
+					# print(selected_goal)
+					# print('eps total extr. reward: ' + str(total_extrin_eps))
+					# env.plot(show_motion=True)
 					break
 				else:
 					# select next goal
@@ -516,12 +526,12 @@ class HQNAgent:
 
 					goal = self.metacontroller.select(self.metacontroller.burnin_policy)
 					proc_goal = self.goal_preprocess(goal)
+					setattr(env, 'goal', proc_goal)
+					selected_goal.append(goal)
+
+
 
 		# start training the networks
-		# TODO: log num of visits
-		# env.reset_fit_logs()
-
-
 		goal_num_samples = np.zeros(self.num_goals)
 
 		for self.num_train_episodes in range(num_episodes):

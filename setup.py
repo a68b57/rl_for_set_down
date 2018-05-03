@@ -17,5 +17,6 @@ setup(
     author_email='dingmingcheng@gmail.com',
     url=None,
     license=license,
-    packages=find_packages(exclude=('LICENSE','docs','tests'))
+    packages=find_packages(exclude=('LICENSE','docs','tests'), install_requires=['numpy'],
+                           install_requires=['matplotlib'])
 )
