@@ -7,3 +7,5 @@
 *.C0190
 other_packages/
 .idea/
+.RL/__pycache__/
+.RL/envs/__pycache__/
