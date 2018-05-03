@@ -9,4 +9,4 @@
 *.pyo
 other_packages/
 .idea/
-__pycache__/
+RL/envs/__pycache__/
