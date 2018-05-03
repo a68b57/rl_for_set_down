@@ -8,5 +8,5 @@
 *.pyc
 *.pyo
 other_packages/
-.idea/*
-**/__pycache__/*
+.idea/
+__pycache__/
