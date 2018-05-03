@@ -1,12 +1,8 @@
 # Add any directories, files, or patterns you don't want to be tracked by version control
 *.dat
-*.csv
+*.pyc
 *.mat
 *.png
 *.mat
 *.C0190
-*.pyc
-*.pyo
 other_packages/
-.idea/
-RL/envs/__pycache__/
