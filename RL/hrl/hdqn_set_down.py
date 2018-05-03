@@ -11,12 +11,13 @@ import inspect
 
 from RL.hrl.objectives import mean_huber_loss
 from RL.hrl.memory import ReplayMemory
-import utils
+import RL.hrl.utils as utils
 
+
+# default hyper-parameters for DQN
 DEBUG = 0
 TENSORBOARD_PLOTS = 1
 MATLAB_PLOTS = 1
-
 GAMMA = 0.99
 ALPHA = 25e-5  # finished
 NUM_EPISODES = 12000  # finished
@@ -28,7 +29,6 @@ TRAIN_FREQ = 2  # not specified
 SAVE_FREQ = 1000  # TODO: adjust it later
 ANNEAL_NUM_STEPS = 50000  # finished for the metacontroller, check what adaptive anneal means for the controller
 EVAL_FREQ = 1,
-
 EVAL_NUM_EPISODES = 10  # finished
 
 
@@ -515,9 +515,9 @@ class HQNAgent:
 					# start new episode
 					if DEBUG:
 						print('Start new episode {0}'.format(episode_idx))
-					# print(selected_goal)
-					# print('eps total extr. reward: ' + str(total_extrin_eps))
-					# env.plot(show_motion=True)
+					print(selected_goal)
+					print('eps total extr. reward: ' + str(total_extrin_eps))
+					env.plot(show_motion=True)
 					break
 				else:
 					# select next goal
@@ -532,6 +532,7 @@ class HQNAgent:
 
 
 		# start training the networks
+		# TODO: update training part
 		goal_num_samples = np.zeros(self.num_goals)
 
 		for self.num_train_episodes in range(num_episodes):
