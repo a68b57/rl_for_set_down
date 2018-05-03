@@ -5,6 +5,8 @@
 *.png
 *.mat
 *.C0190
+*.pyc
+*.pyo
 other_packages/
-**/.idea/
-**/__pycache__/
+.idea/
+#.iml
