@@ -6,3 +6,4 @@
 *.mat
 *.C0190
 other_packages/
+.idea/
