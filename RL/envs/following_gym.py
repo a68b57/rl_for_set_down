@@ -8,7 +8,6 @@ from gym.utils import seeding
 import spec_tools.spec_tools as st
 
 
-
 class Following_gym(gym.Env):
 
 	"""
@@ -25,11 +24,11 @@ class Following_gym(gym.Env):
 
 	def __init__(self):
 		self.init_h_s_ct = 5
-		self.init_hoist_len = 3.5
+		self.init_hoist_len = 4.8
 		self.cur_limit = None
 		self.init_limit = self.init_h_s_ct - self.init_hoist_len + 1.5
-		self.limit_decay = 0.99
-		self.limit_min = 1
+		self.limit_decay = 0.9
+		self.limit_min = 0.2
 
 		self.lowering_speed = 12/60
 		self.lifting_speed = 12/60
@@ -40,7 +39,7 @@ class Following_gym(gym.Env):
 		self.cur_step = None
 		self.t = None
 
-		self.holding_length = 1 # skip 5 frames per action
+		self.holding_length = 0.6 # skip 3 frames per action
 		self.holding_step = max(1, int(self.holding_length / self.dt))
 
 		self.seed()
@@ -53,10 +52,8 @@ class Following_gym(gym.Env):
 		self.rel_motion_sc = None
 		self.rel_motion_sc_t = None
 
-		self.resp = st.Spectrum.from_synthetic(spreading=None, Hs=1.5, Tp=20)
-		# self.rel_motion_sc_t, self.rel_motion_sc = self.resp.make_time_trace(self.num_step + 200, self.dt)
-		# self.rel_motion_sc = self.load_file('/home/michael/Desktop/workspace/rl_for_set_down/RL/log/' + 'training_motion_exp18.csv')
-		
+		self.resp = st.Spectrum.from_synthetic(spreading=None, Hs=0.3, Tp=20)
+
 		self.cur_d_sb = None # current distance between supply boat and block (margin for the right)
 		self.cur_d_blimit = None # margin to the left
 		self.prev_d_sb = None
@@ -64,8 +61,8 @@ class Following_gym(gym.Env):
 
 		self.high_limit = (self.init_h_s_ct - self.init_hoist_len + 10)*np.ones(2*(int(self.obs_len/self.dt)+int(self.pred_len/self.dt)))
 		# self.high_limit = (self.init_h_s_ct - self.init_hoist_len + 10)*np.ones(1*(int(self.obs_len/self.dt)+int(self.pred_len/self.dt)))
-		self.action_space = spaces.Discrete(3)
-		# self.action_space = spaces.Discrete(13)
+		# self.action_space = spaces.Discrete(3)
+		self.action_space = spaces.Discrete(13)
 
 		self.observation_space = spaces.Box(-self.high_limit, high=self.high_limit, dtype=np.float16)
 		self.state = np.zeros([self.high_limit.shape[0]])
@@ -74,7 +71,6 @@ class Following_gym(gym.Env):
 		self.hoist_len_track = []
 		self.d_sb_track = []
 		self.d_blimit_track = []
-
 
 	def seed(self, seed=None):
 		self.np_random, seed = seeding.np_random(seed)
@@ -96,7 +92,6 @@ class Following_gym(gym.Env):
 
 		self.rel_motion_sc_t, self.rel_motion_sc = self.resp.make_time_trace(self.num_step + 200, self.dt)
 		cur_motion_s = self.rel_motion_sc[0:self.predicting_steps]
-
 
 		# first two elements are margin to right and left
 		self.state[self.initial_waiting_steps-1] = self.cur_d_sb
@@ -139,23 +134,26 @@ class Following_gym(gym.Env):
 
 		self.prev_d_sb = d_sb
 
+		self.holding_step = abs(action)
+
 		for k in range(self.holding_step):
 
 			self.hoist_len_track.append(hoist_len)
 			self.d_sb_track.append(d_sb)
 			self.d_blimit_track.append(self.cur_d_blimit)
 
-			if action == 1: # right,payout
-				hoist_len = hoist_len + self.lowering_speed * self.dt
+			# if action == 1: # right,payout
+			# 	hoist_len = hoist_len + self.lowering_speed * self.dt
+			#
+			# elif action == 2: # left,haulin
+			# 	hoist_len = max(hoist_len - self.lifting_speed * self.dt, 0)
+			# else:
+			# 	pass
 
-			elif action == 2: # left,haulin
-				hoist_len = max(hoist_len - self.lifting_speed * self.dt, 0)
-			else:
-				pass
+			speed = (action - 6) / 30
+			speed = np.linspace(0, speed, self.holding_step)[k]
 
-			# speed = (action - 6) / 30
-			# hoist_len = max(hoist_len + speed * self.dt, 0)
-
+			hoist_len = max(hoist_len + speed * self.dt, 0)
 
 			self.cur_hoist_length = hoist_len
 
@@ -173,7 +171,7 @@ class Following_gym(gym.Env):
 
 		pred = self.rel_motion_sc[self.cur_step + 1:self.cur_step + 1 + self.predicting_steps]
 
-		# self.state[self.initial_waiting_steps - 1] = self.cur_d_sb
+		self.state[self.initial_waiting_steps - 1] = self.cur_d_sb
 		self.state[self.initial_waiting_steps] = self.cur_d_blimit
 
 		self.state[2:self.predicting_steps + 2] = self.cur_d_sb - pred
@@ -200,17 +198,21 @@ class Following_gym(gym.Env):
 			lines = []
 			lines.extend(ax.plot(self.init_h_s_ct - h_len[0], color = 'red', marker = 'x', markersize=15))
 			lines.extend(ax.plot(self.init_h_s_ct - d_sb[0] - h_len[0], color = 'blue', marker = 'x', markersize=15))
+			lines.extend(ax.plot(self.init_h_s_ct - d_sb[0] + d_blimit[0], color = 'green', marker = 'x',
+			                     markersize=15))
 
 			def animate(i):
 				lines[0].set_ydata(self.init_h_s_ct-h_len[i])
 				lines[1].set_ydata(self.init_h_s_ct-d_sb[i]-h_len[i])
+				lines[2].set_ydata(self.init_h_s_ct-h_len[i] + d_blimit[i])
 				ax.set_title("time: %.1fs, d_sb: %.2fm" % (i*self.dt, d_sb[i]), fontsize=15)
-				ax.legend(['block', 'barge'])
+				ax.legend(['block', 'barge', 'limit'])
 				return lines
 
 			def init():
 				lines[0].set_ydata(self.init_h_s_ct-h_len[0])
 				lines[1].set_ydata(self.init_h_s_ct-d_sb[0]-h_len[0])
+				lines[2].set_ydata(self.init_h_s_ct - h_len[0]+d_blimit[0])
 				return lines
 
 			num_frame = len(d_sb)
@@ -220,7 +222,7 @@ class Following_gym(gym.Env):
 
 		if show_motion:
 			fig, ax = plt.subplots()
-			ax.set_ylim([-1, 10])
+			ax.set_ylim([-0.5, 1.5])
 			x = np.linspace(0, int(self.cur_step * self.dt), len(d_sb))
 			plt.plot(x, self.init_h_s_ct - h_len)
 			plt.plot(x, self.init_h_s_ct - d_sb - h_len)

@@ -99,6 +99,7 @@ ax3.set_ylabel('AR', fontsize=15)
 ax3.set_xlabel('time_step(dt=0.2s)', fontsize=15)
 start_show = int(obs_len*0.95)
 
+
 def getPred(input_seq, mode="LSTM"):
 	if mode == "LSTM":
 		pred = toolkit.predict_no_loading(encoder_model, decoder_model, input_seq[:,0:obs_len,:].reshape(1,obs_len,1), pred_len)

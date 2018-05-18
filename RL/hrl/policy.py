@@ -135,7 +135,7 @@ class GreedyEpsilonPolicy(Policy):
 		if DEBUG:
 			print('GreedyEpsilon: epsilon {0} action {1}'.format(self.epsilon, action))
 
-		return action
+		return action, q_values[0][action]
 
 
 class LinearDecayGreedyEpsilonPolicy(Policy):
@@ -181,11 +181,10 @@ class LinearDecayGreedyEpsilonPolicy(Policy):
 		a = -float(self.start_value - self.end_value) / float(self.num_steps)
 		b = float(self.start_value)
 		self.policy.epsilon = max(self.end_value, a * float(num_update) + b)
-		#print 'Annealed Epsilon {0}'.format(self.policy.epsilon)
-		action = self.policy.select(q_values)
+		action, q = self.policy.select(q_values)
 		if DEBUG:
 			print('LinearDecay: epsilon {0} action {1}'.format(self.policy.epsilon, action))
-		return action
+		return action, q
 
 	def reset(self):
 		"""Start the decay over at the start value."""

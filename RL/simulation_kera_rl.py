@@ -15,14 +15,14 @@ from rl.callbacks import FileLogger, ModelIntervalCheckpoint, TestLogger
 
 
 
-ENV_NAME = 'SetDown-v1'
-# ENV_NAME = 'Following-v1'
+# ENV_NAME = 'SetDown-v1'
+ENV_NAME = 'Following-v1'
 
 
 model_dir = './model/exp22/'
 log_dir = './log/exp22/'
 
-exp_name = '23.8'
+exp_name = '22.25'
 
 if __name__ == "__main__":
 	env = gym.make(ENV_NAME)
@@ -47,13 +47,13 @@ if __name__ == "__main__":
 
 	dqn.compile(SGD(lr=1e-3), metrics=['mse'])
 
-	dqn.load_weights(model_dir + 'following_'+'23.1'+'_weights_1300000.h5f')
+	# dqn.load_weights(model_dir + 'following_'+'22.25'+'_weights_300000.h5f')
 
-	# weights_filename = model_dir + 'following_{}_weights.h5f'.format(exp_name)
-	# checkpoint_weights_filename = model_dir + 'following_' + exp_name + '_weights_{step}.h5f'
-	# log_filename = log_dir + 'following_{}_log.csv'.format(exp_name)
-	# callbacks = [ModelIntervalCheckpoint(checkpoint_weights_filename, interval=100000)]
-	# callbacks += [FileLogger(log_filename, interval=1)]
+	weights_filename = model_dir + 'following_{}_weights.h5f'.format(exp_name)
+	checkpoint_weights_filename = model_dir + 'following_' + exp_name + '_weights_{step}.h5f'
+	log_filename = log_dir + 'following_{}_log.csv'.format(exp_name)
+	callbacks = [ModelIntervalCheckpoint(checkpoint_weights_filename, interval=100000)]
+	callbacks += [FileLogger(log_filename, interval=1)]
 
-	# dqn.fit(env, nb_steps=1500000, visualize=False, verbose=2, callbacks=callbacks)
+	dqn.fit(env, nb_steps=1500000, visualize=False, verbose=2, callbacks=callbacks)
 	dqn.test(env, nb_episodes=500, visualize=False)

@@ -32,6 +32,7 @@ class HRL_gym(gym.Env):
 		self.max_goal_num_step = int(np.ceil(goal_timeout / self.dt)) + 1
 		self.cur_step = None
 		self.t = None
+		self.t_set_down = None
 
 		# param meta-controller
 		self.num_goals = num_goals # goal dict 0:fsd_1s 1:fsd_2s 2:fsd_3a 3:f_1s 4:f_2s 5:f_3s 6:sd
@@ -84,6 +85,7 @@ class HRL_gym(gym.Env):
 		# timing meta-controller
 		self.t = 0
 		self.cur_step = 0
+		self.t_set_down = 0
 
 		# time controller
 		self.goal_cur_step = 0
@@ -94,7 +96,7 @@ class HRL_gym(gym.Env):
 		self.prev_d_sb = self.cur_d_sb
 		self.cur_hoist_length = self.init_hoist_len
 		self.cur_limit = self.init_limit
-		self.final_imp_vel = 0
+		self.final_imp_vel = None
 
 		# wave and motion
 		self.rel_motion_sc_t, self.rel_motion_sc = self.resp.make_time_trace(self.max_eps_num_step + 200, self.dt)
@@ -160,14 +162,15 @@ class HRL_gym(gym.Env):
 			# set-down game
 			if self.goal_completed:
 				vel = (self.prev_d_sb - self.cur_d_sb) / self.dt
-				if 0 < vel < 0.3:  # good one
+				if 0 < vel < 0.5:  # good one
 					reward = 10 * 1 / vel
-					print(vel)
 					self.final_imp_vel = vel
+					# if vel < 0.2:
+					# 	self.plot(show_motion=True)
 				else:
 					reward = -30
 			if self.goal_over:
-				reward = -30
+				reward = -100
 		return reward
 
 	def get_extrinsic_reward(self):
@@ -176,7 +179,7 @@ class HRL_gym(gym.Env):
 			for completing goals and have imp_vel(identical to intrinsic reward)
 		"""
 		reward = 0
-		if not self.intp_goal():
+		if not self.intp_goal() or self.eps_over:
 			"""identical to the intr. reward of set-down"""
 			reward = self.get_intrinsic_reward()
 
@@ -335,13 +338,15 @@ class HRL_gym(gym.Env):
 			plt.plot(self.init_h_s_ct - h_len)
 			plt.plot(self.init_h_s_ct - d_sb - h_len)
 			plt.plot(self.init_h_s_ct - h_len + d_blimit)
+			plt.axvline(x=self.t_set_down)
 			plt.xlabel('time(s)')
 			plt.ylabel('distance (m)')
 			plt.title("impact_velocity %.3f m/s" % self.final_imp_vel)
 			plt.legend(['motion_block', 'motion_barge','limit'])
-			# plt.pause(3)
-			# plt.close()
-			plt.show()
+			plt.pause(3)
+			plt.close()
+			# plt.show()
+
 	def save_file(self, file_dir, data):
 		np.savetxt(file_dir, data, delimiter=',')
 
