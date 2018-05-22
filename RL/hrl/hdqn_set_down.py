@@ -2,7 +2,7 @@
 
 import tensorflow as tf
 from keras.layers import (Activation, Dense, Flatten, merge, Input, Multiply)
-from keras.models import Model
+from keras.models import Model, Sequential
 import numpy as np
 import copy
 import inspect
@@ -54,7 +54,6 @@ def create_deep_model(input_shape, num_outputs, act_func='relu'):
 	model = Model(inputs=input_state + [input_mask], outputs=[f])
 
 	return model
-
 
 def save_scalar(step, name, value, writer):
 	"""Save a scalar value to tensorboard.
@@ -356,7 +355,12 @@ class HQNAgent:
 		                                  model_dir=meta_controller_dir,
 		                                  exp_name=self.exp_name)
 
-		self.set_down_model = None
+		self.set_down_model = Sequential()
+		self.set_down_model.add(Flatten(input_shape=(1,) + (26,)))
+		self.set_down_model.add(Dense(100))
+		self.set_down_model.add(Activation('sigmoid'))
+		self.set_down_model.add(Dense(13))
+		self.set_down_model.add(Activation('linear'))
 		self.set_down_model.load_weights(set_down_model_dir)
 
 		# tensorbboard logistics
@@ -501,9 +505,13 @@ class HQNAgent:
 				# goal has not been reached and the episode has not finished
 				while True:
 
-					# select next action given the current goal and state, individual epsilon for each goal
-					action, _ = self.controller.select(policy=self.controller.training_policy,
-					                                   state=[state, proc_goal], num_update=goal_num_samples[goal])
+					if goal != self.num_goals - 1:
+						# select next action given the current goal and state, individual epsilon for each goal
+						action, _ = self.controller.select(policy=self.controller.training_policy,
+						                                   state=[state, proc_goal], num_update=goal_num_samples[goal])
+					else:
+						q_values = self.set_down_model.predict(state)
+						action = np.argmax(q_values)
 
 					# apply the action to the environment, get reward and nextstate
 					next_state, in_reward, is_goal_completed, is_goal_over, is_eps_completed, is_eps_over = env.step(
@@ -513,13 +521,14 @@ class HQNAgent:
 					# compute external reward
 					extrinsic_reward += env.get_extrinsic_reward()
 
-					# store the experience in the controller's memory
-					self.controller.num_samples += 1
-					self.controller.memory.append([state, proc_goal],
-					                              action,
-					                              in_reward,
-					                              [copy.copy(next_state), proc_goal],
-					                              is_goal_over or is_eps_completed)
+					if goal != self.num_goals - 1:
+						# store the experience in the controller's memory
+						self.controller.num_samples += 1
+						self.controller.memory.append([state, proc_goal],
+						                              action,
+						                              in_reward,
+						                              [copy.copy(next_state), proc_goal],
+						                              is_goal_over or is_eps_completed)
 
 					# update the weights of the controller's network
 					self.controller.update_policy(self.writer)
@@ -568,7 +577,7 @@ class HQNAgent:
 					setattr(env, 'goal', proc_goal)
 					selected_goal.append(goal)
 
-					if goal == 6:
+					if goal == self.num_goals - 1: # goal is set-down
 						setattr(env, 't_set_down', env.cur_step)
 						setattr(env, 'height_set_down', env.cur_d_sb)
 
@@ -618,8 +627,18 @@ class HQNAgent:
 
 				# new goal
 				while True:
-					action, _ = self.controller.select(policy=self.controller.testing_policy,
-					                                   state=[state, proc_goal])
+
+					if goal != self.num_goals - 1:
+						# select next action given the current goal and state, individual epsilon for each goal
+						action, _ = self.controller.select(policy=self.controller.training_policy,
+						                                   state=[state, proc_goal])
+
+					else:
+						state_set_down = [state[0][0]]
+						state_set_down.extend(state[0][2:27])
+						state_set_down = np.reshape(state_set_down,(1,1,26))
+						q_values = self.set_down_model.predict(state_set_down)
+						action = np.argmax(q_values)
 
 					# apply the action to the environment, get reward and next state
 					next_state, in_reward, is_goal_completed, is_goal_over, is_eps_completed, is_eps_over = env.step(
@@ -642,6 +661,7 @@ class HQNAgent:
 						print("Evl episode:{0}, imp_vel:{1}, total reward: {2}".format(episode_idx,
 						                                                               env.final_imp_vel, total_reward))
 						print(selected_goal)
+						print('height of set-down: {0}'.format(env.height_set_down))
 						if env.final_imp_vel: imp_vels.append(env.final_imp_vel)
 					else:
 						print("Evl episode:{0} fail".format(episode_idx))
@@ -654,7 +674,7 @@ class HQNAgent:
 					selected_goal.append(goal)
 					if goal == 6:
 						setattr(env, 't_set_down', env.cur_step)
-
+						setattr(env, 'height_set_down', env.cur_d_sb)
 		print("mean vel: {0}, std: {1}".format(np.mean(imp_vels),np.std(imp_vels)))
 		print("Completed: {0}, fail: {1}".format(len(imp_vels), num_episodes-len(imp_vels)))
 		# update the tensorboard logistics

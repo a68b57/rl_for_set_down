@@ -12,8 +12,8 @@ class SetDown_gym(gym.Env):
 	def __init__(self):
 		# self.init_h_s_ct = 10
 		# self.init_hoist_len = 3
-		self.init_h_s_ct = 10
-		self.init_hoist_len = 3
+		self.init_h_s_ct = 5
+		self.init_hoist_len = 4
 		self.cur_limit = None
 		self.init_limit = self.init_h_s_ct - self.init_hoist_len + 1.5
 		# self.init_limit = self.init_h_s_ct - self.init_hoist_len + 5

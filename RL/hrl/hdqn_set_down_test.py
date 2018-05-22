@@ -72,7 +72,8 @@ def main():
 		controller_dir='model/controller_source_exp4_2900000.weight',
 		meta_controller_dir='model/metacontroller_source_exp4_2900000.weight',
 		exp_name=EXP_NAME,
-		save_freq=model_save_freq
+		save_freq=model_save_freq,
+		set_down_model_dir='../model/exp22/following_23.1.2_weights_1500000.h5f'
 	)
 
 	# hdqn_agent.fit(env, test_env, NUM_EPISODES, EVAL_NUM_EPISODES)
