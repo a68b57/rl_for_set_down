@@ -24,6 +24,7 @@ class HRL_gym(gym.Env):
 		self.prev_d_sb = None
 		self.cur_hoist_length = None
 		self.final_imp_vel = 0
+		self.height_set_down = None
 
 		# timing meta-controller
 		self.dt = dt
@@ -97,6 +98,8 @@ class HRL_gym(gym.Env):
 		self.cur_hoist_length = self.init_hoist_len
 		self.cur_limit = self.init_limit
 		self.final_imp_vel = None
+		self.height_set_down = None
+
 
 		# wave and motion
 		self.rel_motion_sc_t, self.rel_motion_sc = self.resp.make_time_trace(self.max_eps_num_step + 200, self.dt)
@@ -206,7 +209,7 @@ class HRL_gym(gym.Env):
 	def is_eps_over(self):
 		"""episode is over then goal is over or episode step meets timeout"""
 		eps_over = False
-		if self.cur_step == self.max_eps_num_step or self.goal_over:
+		if self.cur_step >= self.max_eps_num_step or self.goal_over:
 			eps_over = True
 		self.eps_over = eps_over
 

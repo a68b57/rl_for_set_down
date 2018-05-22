@@ -22,8 +22,7 @@ REPLAY_BUFFER_SIZE = 1000000  # not specified, found in Ethan's code
 BATCH_SIZE = 16  # not specified
 TARGET_UPDATE_FREQ = 1000  # not specified
 NUM_BURNIN = 1000  # not specified
-TRAIN_FREQ = 2  # not specified
-SAVE_FREQ = 1000  # TODO: adjust it later
+SAVE_FREQ = 1000  # model save freq
 ANNEAL_NUM_STEPS = 50000  # finished for the metacontroller, check what adaptive anneal means for the controller
 EVAL_FREQ = 1,
 EVAL_NUM_EPISODES = 10  # finished
@@ -91,13 +90,15 @@ class HQNAgent:
 		             testing_policy,
 		             num_burnin=NUM_BURNIN,
 		             gamma=GAMMA,
-		             alpha=ALPHA,
 		             optimizer=OPTIMIZER,
 		             loss_function=mean_huber_loss,
 		             target_update_freq=TARGET_UPDATE_FREQ,
 		             batch_size=BATCH_SIZE,
 		             mem_size=REPLAY_BUFFER_SIZE,
-		             model_dir=None):
+		             model_dir=None,
+		             exp_name='None'):
+
+			self.exp_name = exp_name
 
 			# network parameters
 			self.module_type = module_type
@@ -107,8 +108,10 @@ class HQNAgent:
 			# learning parameters
 			# the discounting reward factor
 			self.gamma = gamma
+
 			# the learning rate
-			self.alpha = alpha
+			# self.alpha = alpha
+
 			# the tensorflow optimizer to be used
 			self.optimizer = optimizer
 			# the loss function to be minimized
@@ -145,17 +148,15 @@ class HQNAgent:
 
 			if model_dir:
 				self.network.load_weights(model_dir)
+				self.target_network.load_weights(model_dir)
 
-			# print self.state_shape
-			# self.network=self.create_linear_model(input_shape=self.state_shape,num_outputs=self.num_choices,act_func='relu')
 			self.network.compile(loss=self.loss_function, optimizer=self.optimizer)
-			# the target network
 
 			# the replay memory
 			self.memory = ReplayMemory(mem_size)
 
 			# tensorboard logistics
-			self.writer = tf.summary.FileWriter('./logs_' + module_type)
+			# self.writer = tf.summary.FileWriter('./logs_' + module_type + '/' + self.exp_name)
 
 		def calc_q_values(self, states):
 			"""Given a state (or batch of states) calculate the Q-values.
@@ -258,17 +259,18 @@ class HQNAgent:
 
 			loss = self.network.train_on_batch(x=state_batch + [mask_batch], y=target_q_batch)
 
-			save_scalar(self.num_updates, 'Loss for {0}'.format(self.module_type), loss, self.writer)
-			if agent_writer is not None:
-				save_scalar(self.num_updates, 'Loss for {0}'.format(self.module_type), loss, agent_writer)
+			# save_scalar(self.num_updates, 'Loss for {0}'.format(self.module_type), loss, self.writer)
+			# if agent_writer is not None:
+			# 	save_scalar(self.num_updates, 'Loss for {0}'.format(self.module_type), loss, agent_writer)
 
 			# update the target network
 			if self.num_updates > 0 and self.num_updates % self.target_update_freq == 0:
 				utils.get_hard_target_model_updates(self.target_network, self.network)
 
 		def save_model(self):
-			self.network.save_weights('{0}_source.weight'.format(self.module_type))
-			self.target_network.save_weights('{0}_target.weight'.format(self.module_type))
+			self.network.save_weights('model/{0}_source_{1}_{2}.weight'.format(self.module_type, self.exp_name,
+			                                                                   self.num_updates))
+			# self.target_network.save_weights('model/{0}_target_{1}.weight'.format(self.module_type, self.exp_name))
 
 	"""Class implementing Hierarchical Q-learning Agent.
 
@@ -287,14 +289,14 @@ class HQNAgent:
 	             metacontroller_burnin_policy,
 	             controller_gamma=GAMMA,
 	             metacontroller_gamma=GAMMA,
-	             controller_alpha=ALPHA,
-	             metacontroller_alpha=ALPHA,
+	             # controller_alpha=ALPHA,
+	             # metacontroller_alpha=ALPHA,
 	             controller_target_update_freq=TARGET_UPDATE_FREQ,
 	             metacontroller_target_update_freq=TARGET_UPDATE_FREQ,
 	             controller_batch_size=BATCH_SIZE,
 	             metacontroller_batch_size=BATCH_SIZE,
-	             controller_optimizer='Adam',
-	             metacontroller_optimizer='Adam',
+	             controller_optimizer='sgd',
+	             metacontroller_optimizer='sgd',
 	             controller_loss_function=mean_huber_loss,
 	             metacontroller_loss_function=mean_huber_loss,
 	             eval_freq=EVAL_FREQ,
@@ -302,7 +304,10 @@ class HQNAgent:
 	             metacontroller_num_burnin=NUM_BURNIN,
 	             replay_buffer_size=REPLAY_BUFFER_SIZE,
 	             controller_dir=None,
-	             meta_controller_dir=None
+	             meta_controller_dir=None,
+	             exp_name='None',
+	             save_freq=SAVE_FREQ,
+	             set_down_model_dir = None
 	             ):
 
 		# agent's description
@@ -310,9 +315,11 @@ class HQNAgent:
 		self.goal_shape = goal_shape
 		self.num_actions = num_actions
 		self.num_goals = num_goals
+		self.exp_name = exp_name
 
 		# agent's parameters
 		self.eval_freq = eval_freq
+		self.save_freq = save_freq
 
 		# agent's learning modules
 		self.controller = self.Module(module_type='controller',
@@ -322,14 +329,15 @@ class HQNAgent:
 		                              training_policy=controller_training_policy,
 		                              testing_policy=controller_testing_policy,
 		                              gamma=controller_gamma,
-		                              alpha=controller_alpha,
+		                              # alpha=controller_alpha,
 		                              optimizer=controller_optimizer,
 		                              loss_function=controller_loss_function,
 		                              batch_size=controller_batch_size,
 		                              num_burnin=controller_num_burnin,
 		                              target_update_freq=controller_target_update_freq,
 		                              mem_size=replay_buffer_size,
-		                              model_dir=controller_dir)
+		                              model_dir=controller_dir,
+		                              exp_name=self.exp_name)
 
 		self.metacontroller = self.Module(module_type='metacontroller',
 		                                  state_shape=[self.state_shape],
@@ -338,20 +346,24 @@ class HQNAgent:
 		                                  training_policy=metacontroller_training_policy,
 		                                  testing_policy=metacontroller_testing_policy,
 		                                  gamma=metacontroller_gamma,
-		                                  alpha=metacontroller_alpha,
+		                                  # alpha=metacontroller_alpha,
 		                                  optimizer=metacontroller_optimizer,
 		                                  loss_function=metacontroller_loss_function,
 		                                  batch_size=metacontroller_batch_size,
 		                                  num_burnin=metacontroller_num_burnin,
 		                                  target_update_freq=metacontroller_target_update_freq,
 		                                  mem_size=replay_buffer_size,
-		                                  model_dir=meta_controller_dir)
+		                                  model_dir=meta_controller_dir,
+		                                  exp_name=self.exp_name)
+
+		self.set_down_model = None
+		self.set_down_model.load_weights(set_down_model_dir)
 
 		# tensorbboard logistics
 		self.sess = tf.Session()
-		self.controller.writer.add_graph(tf.get_default_graph())
-		self.metacontroller.writer.add_graph(tf.get_default_graph())
-		self.writer = tf.summary.FileWriter('./logs_hdqn')
+		# self.controller.writer.add_graph(tf.get_default_graph())
+		# self.metacontroller.writer.add_graph(tf.get_default_graph())
+		self.writer = tf.summary.FileWriter('./logs_hdqn/'+self.exp_name)
 
 	def goal_preprocess(self, goal):
 		# print self.goal_shape
@@ -381,7 +393,7 @@ class HQNAgent:
 			state = env.reset()
 
 			# select next goal
-			goal = self.metacontroller.select(self.metacontroller.burnin_policy)
+			goal, _ = self.metacontroller.select(self.metacontroller.burnin_policy)
 			proc_goal = self.goal_preprocess(goal)
 			setattr(env, 'goal', proc_goal)
 
@@ -407,7 +419,7 @@ class HQNAgent:
 					# action level
 
 					# select next action given the current goal
-					action = self.controller.select(self.controller.burnin_policy)
+					action, _ = self.controller.select(self.controller.burnin_policy)
 
 					# apply the action to the environment, get reward and nextstate
 					next_state, in_reward, is_goal_completed, is_goal_over, is_eps_completed, is_eps_over = env.step(
@@ -518,10 +530,10 @@ class HQNAgent:
 					self.metacontroller.num_updates += 1
 
 					# check if it's time to store the controller's model
-					if self.controller.num_updates > 0 and self.controller.num_updates % SAVE_FREQ == 0:
+					if self.controller.num_updates > 0 and self.controller.num_updates % self.save_freq == 0:
 						self.controller.save_model()
 
-					if self.metacontroller.num_updates > 0 and self.metacontroller.num_updates % SAVE_FREQ == 0:
+					if self.metacontroller.num_updates > 0 and self.metacontroller.num_updates % self.save_freq == 0:
 						self.metacontroller.save_model()
 
 					# a deep copy of the value: important!
@@ -558,6 +570,13 @@ class HQNAgent:
 
 					if goal == 6:
 						setattr(env, 't_set_down', env.cur_step)
+						setattr(env, 'height_set_down', env.cur_d_sb)
+
+			save_scalar(self.num_train_episodes,'Total extrinsic reward', total_extrin_eps, self.writer)
+			save_scalar(self.num_train_episodes, 'Episode mean Q', float(np.mean(mean_q)), self.writer)
+			if env.height_set_down:
+				save_scalar(self.num_train_episodes, 'Moment of set-down', float(env.t_set_down/env.cur_step), self.writer)
+				save_scalar(self.num_train_episodes, 'Height of set-down',  env.height_set_down, self.writer)
 
 			print('Num update: {0}, Training episode: {1}, Impact_vel: {2},Total Reward: {3}, Mean_q: {4}'.format(
 				self.metacontroller.num_updates, self.num_train_episodes, env.final_imp_vel, total_extrin_eps,
@@ -574,6 +593,8 @@ class HQNAgent:
 
 		episode_length = 0
 
+		imp_vels = []
+
 		print('Start Evaluation')
 		for episode_idx in range(num_episodes):
 
@@ -582,6 +603,7 @@ class HQNAgent:
 			total_reward = 0
 
 			state = env.reset()
+
 			assert state is not None
 
 			# select next goal
@@ -620,6 +642,7 @@ class HQNAgent:
 						print("Evl episode:{0}, imp_vel:{1}, total reward: {2}".format(episode_idx,
 						                                                               env.final_imp_vel, total_reward))
 						print(selected_goal)
+						if env.final_imp_vel: imp_vels.append(env.final_imp_vel)
 					else:
 						print("Evl episode:{0} fail".format(episode_idx))
 					break
@@ -632,6 +655,8 @@ class HQNAgent:
 					if goal == 6:
 						setattr(env, 't_set_down', env.cur_step)
 
+		print("mean vel: {0}, std: {1}".format(np.mean(imp_vels),np.std(imp_vels)))
+		print("Completed: {0}, fail: {1}".format(len(imp_vels), num_episodes-len(imp_vels)))
 		# update the tensorboard logistics
 		# save_scalar(self.num_train_episodes, 'Testing Total Reward', total_reward, self.writer)
 		# save_scalar(self.num_train_episodes, 'Testing Episode Length ', episode_length / num_episodes, self.writer)

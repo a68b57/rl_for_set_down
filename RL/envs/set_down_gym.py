@@ -12,8 +12,8 @@ class SetDown_gym(gym.Env):
 	def __init__(self):
 		# self.init_h_s_ct = 10
 		# self.init_hoist_len = 3
-		self.init_h_s_ct = 5
-		self.init_hoist_len = 4
+		self.init_h_s_ct = 10
+		self.init_hoist_len = 3
 		self.cur_limit = None
 		self.init_limit = self.init_h_s_ct - self.init_hoist_len + 1.5
 		# self.init_limit = self.init_h_s_ct - self.init_hoist_len + 5
@@ -24,7 +24,7 @@ class SetDown_gym(gym.Env):
 
 		self.lowering_speed = 12 / 60
 		self.lifting_speed = 12 / 60
-		self.num_action = 11
+		self.num_action = 13
 		self.dt = 0.2
 		self.timeout = 200
 		self.hit_steps = 5
@@ -48,7 +48,6 @@ class SetDown_gym(gym.Env):
 
 		self.resp = st.Spectrum.from_synthetic(spreading=None, Hs=1.5, Tp=15)
 		self.rel_motion_sc_t, self.rel_motion_sc = self.resp.make_time_trace(self.num_step + 200, self.dt)
-		# self.rel_motion_sc = self.load_file('/home/michael/Desktop/workspace/rl_for_set_down/RL/log/' + 'training_motion_exp18.csv')
 
 		self.cur_d_sb = None # current distance between supply boat and block (margin for the right)
 		self.cur_d_blimit = None # margin to the left
@@ -91,15 +90,29 @@ class SetDown_gym(gym.Env):
 
 		# first two elements are margin to right and left
 		self.state[self.initial_waiting_steps - 1] = self.cur_d_sb
+
+		# comment for both margin
+		self.state[self.initial_waiting_steps :self.predicting_steps + 1] =\
+				self.cur_d_sb - (self.rel_motion_sc[1:self.predicting_steps + 1] - cur_motion_s[0])
+
+		# uncomment for both margin
 		# self.state[self.initial_waiting_steps] = self.cur_d_blimit
 
-		#prediction of right margin
-		# self.state[self.initial_waiting_steps + 1:self.predicting_steps + 2] = self.cur_d_sb - (self.rel_motion_sc[1:self.predicting_steps+1]-cur_motion_s)
-		self.state[self.initial_waiting_steps:self.predicting_steps+1] = self.cur_d_sb + (self.rel_motion_sc[0]-cur_motion_s)
+		#prediction of right margin (old)
+		# self.state[self.initial_waiting_steps:self.predicting_steps+1] = self.cur_d_sb + (self.rel_motion_sc[0]-cur_motion_s)
 
-		#prediction of left margin
+		#prediction of left margin (old)
 		# self.state[self.predicting_steps + 2:] = self.cur_d_blimit + (self.rel_motion_sc[1:self.predicting_steps+1]-cur_motion_s)
-		# self.state[self.predicting_steps + 1:] = self.cur_d_blimit + (self.rel_motion_sc[1:self.predicting_steps+1]-cur_motion_s)
+
+
+		# uncomment for both margin mode
+		# prediction of right margin
+		# self.state[self.initial_waiting_steps + 1:self.predicting_steps + 2] =\
+		# 	self.cur_d_sb - (self.rel_motion_sc[1:self.predicting_steps + 1] - cur_motion_s[0])
+
+		# prediction of left margin
+		# self.state[self.predicting_steps + 2:] =\
+		# 	self.cur_d_blimit + (self.rel_motion_sc[1:self.predicting_steps + 1] - cur_motion_s[0])
 
 		self.state = np.reshape(self.state, [self.state.shape[0], ])
 		return np.array(self.state)
@@ -115,10 +128,10 @@ class SetDown_gym(gym.Env):
 					reward = 10*1/vel
 					self.final_imp_vel = vel
 				else: # bad one
-					# reward = -30
-					reward = 0
-			if self.cur_d_sb > self.cur_limit: # hit boundary
-				reward = -30
+					reward = -30
+					# reward = 0
+			# if self.cur_d_sb > self.cur_limit: # hit boundary
+			# 	reward = -30
 
 		if not gameover:
 			reward = -0.01
@@ -156,7 +169,7 @@ class SetDown_gym(gym.Env):
 			# else:
 			# 	pass
 
-			speed = (action-int((self.num_action-1)/2))/30
+			speed = (action-int((self.num_action-1)//2))/30
 			hoist_len = max(hoist_len + speed * self.dt, 0)
 
 			self.cur_hoist_length = hoist_len
@@ -179,12 +192,16 @@ class SetDown_gym(gym.Env):
 		pred = self.rel_motion_sc[self.cur_step:self.cur_step + self.predicting_steps+1]
 
 		self.state[self.initial_waiting_steps - 1] = self.cur_d_sb
+
+		# comment for both margin mode
+		self.state[self.initial_waiting_steps :self.predicting_steps + 1] = self.cur_d_sb - (pred[0] - pred[1:])
+
+		# uncomment for both margin mode
 		# self.state[self.initial_waiting_steps] = self.cur_d_blimit
 
-		# self.state[2:self.predicting_steps + 2] = self.cur_d_sb - (pred-self.rel_motion_sc[self.cur_step:self.cur_step + self.predicting_steps])
-		self.state[self.initial_waiting_steps:self.predicting_steps+1] = self.cur_d_sb + (pred[0] - pred[1:])
+		# self.state[self.initial_waiting_steps+1:self.predicting_steps+2] = self.cur_d_sb - (pred[0] - pred[1:])
 
-		# self.state[self.predicting_steps + 2:] = self.cur_d_blimit + (pred-self.rel_motion_sc[self.cur_step:self.cur_step + self.predicting_steps])
+		# self.state[self.predicting_steps + 2:] = self.cur_d_blimit + (pred[1:] - pred[0])
 
 		done = self.if_gameover()
 		reward = self.get_reward(done)

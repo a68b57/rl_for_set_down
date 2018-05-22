@@ -69,7 +69,7 @@ class UniformRandomPolicy(Policy):
 		action = np.random.randint(0, self.num_actions)
 		if DEBUG:
 			print('In uniform policy: action {0}'.format(action))
-		return action
+		return action, None
 
 	def get_config(self):  # noqa: D102
 		return {'num_actions': self.num_actions}
@@ -87,7 +87,7 @@ class GreedyPolicy(Policy):
 			print('Q-values')
 			print(q_values)
 			print('In greedy policy: action {0}'.format(action))
-		return action
+		return action, q_values[0][action]
 
 
 class GreedyEpsilonPolicy(Policy):
