@@ -19,7 +19,7 @@ ENV_NAME = 'SetDown-v1'
 model_dir = './model/exp22/'
 log_dir = './log/exp22/'
 
-exp_name = '23.1.2'
+exp_name = '23.1.2.4'
 
 if __name__ == "__main__":
 	env = gym.make(ENV_NAME)
@@ -35,16 +35,16 @@ if __name__ == "__main__":
 	model.add(Activation('linear'))
 	print(model.summary())
 
-	memory = SequentialMemory(limit=5000, window_length=1)
+	memory = SequentialMemory(limit=50000, window_length=1)
 	policy = LinearAnnealedPolicy(EpsGreedyQPolicy(), attr='eps', value_max=0.5, value_min=0.1, value_test=0,
-	                              nb_steps=10000)
+	                              nb_steps=50000)
 
 	dqn = DQNAgent(model=model, nb_actions=nb_actions, memory=memory, nb_steps_warmup=10,
-	               target_model_update=1000, policy=policy, enable_dueling_network=False, enable_double_dqn=True)
+	               target_model_update=10000, policy=policy, enable_dueling_network=False, enable_double_dqn=True)
 
-	dqn.compile(SGD(lr=1e-3), metrics=['mse'])
+	dqn.compile(Adam(lr=1e-3), metrics=['mse'])
 
-	dqn.load_weights(model_dir + 'following_'+'23.4.4'+'_weights_1500000.h5f')
+	dqn.load_weights(model_dir + 'following_'+'23.1.2.4'+'_weights_1300000.h5f')
 
 	# weights_filename = model_dir + 'following_{}_weights.h5f'.format(exp_name)
 	# checkpoint_weights_filename = model_dir + 'following_' + exp_name + '_weights_{step}.h5f'

@@ -48,8 +48,8 @@ tol_len = 500000
 # 3,5
 
 
-hs = 3
-tp = 5
+hs = 1.5
+tp = 15
 
 resp = st.Spectrum.from_synthetic(spreading=None, Hs=hs, Tp=tp)
 # resp.plot()
@@ -112,6 +112,7 @@ def getPred(input_seq, mode="LSTM"):
 		pred = toolkit.fourierExtrapolation(input_seq[:,0:obs_len,:], pred_len).reshape(pred_len,1)
 
 	if mode == "AR":
+		# pred = toolkit.computeAR(input_seq[:,0:obs_len,:], pred_len, lag=14).reshape(pred_len,1)
 		pred = toolkit.computeAR(input_seq[:,0:obs_len,:], pred_len, lag=14).reshape(pred_len,1)
 
 	return np.concatenate((input_seq[0][0:obs_len], pred), axis=0)[start_show:]

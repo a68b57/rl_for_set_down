@@ -4,11 +4,13 @@ import numpy as np
 from matplotlib import pyplot as plt
 import matplotlib.animation as animation
 import spec_tools.spec_tools as st
+import RNN.toolkit as toolkit
+from gym.utils import seeding
 
 
 class HRL_gym(gym.Env):
 	def __init__(self, init_barge_ct, init_hoist_len, limit_decay, limit_min, dt, eps_timeout, goal_timeout, obs_len,
-	             pred_len, hs, tp, num_actions, num_goals):
+	             pred_len, hs, tp, num_actions, num_goals, use_AR, initial_waiting_step):
 		"""initialize the environment before training"""
 
 		# geometry
@@ -29,7 +31,7 @@ class HRL_gym(gym.Env):
 		# timing meta-controller
 		self.dt = dt
 		self.hit_steps = 5  # visualize last n steps before touching
-		self.max_eps_num_step = int(np.ceil(eps_timeout / self.dt)) + 1
+		self.max_eps_num_step = int(np.ceil(eps_timeout / self.dt)) + 1 + initial_waiting_step
 		self.max_goal_num_step = int(np.ceil(goal_timeout / self.dt)) + 1
 		self.cur_step = None
 		self.t = None
@@ -57,8 +59,10 @@ class HRL_gym(gym.Env):
 		self.goal_over = False
 
 		# states
+		self.use_AR = use_AR
 		self.obs_len = obs_len
-		self.initial_waiting_steps = int(self.obs_len / self.dt)  # waiting time for the first observation
+		# self.initial_waiting_steps = int(self.obs_len / self.dt)  # waiting time for the first observation
+		self.initial_waiting_steps = initial_waiting_step
 		self.pred_len = pred_len
 		self.predicting_steps = int(self.pred_len / self.dt)
 		self.high_limit = (self.init_h_s_ct - self.init_hoist_len + 10) * np.ones(
@@ -68,12 +72,16 @@ class HRL_gym(gym.Env):
 
 		# wave and motion
 		self.resp = st.Spectrum.from_synthetic(spreading=None, Hs=hs, Tp=tp)
-		self.rel_motion_sc_t, self.rel_motion_sc = self.resp.make_time_trace(self.max_eps_num_step + 200, self.dt)
+		self.rel_motion_sc_t, self.rel_motion_sc = self.resp.make_time_trace(self.max_eps_num_step + 1000, self.dt)
 
 		# logging
 		self.hoist_len_track = []
 		self.d_sb_track = []
 		self.d_blimit_track = []
+
+	def seed(self, seed=None):
+		self.np_random, seed = seeding.np_random(seed)
+		return [seed]
 
 	def reset(self):
 		"""reset parameters for every eps"""
@@ -86,6 +94,8 @@ class HRL_gym(gym.Env):
 		# timing meta-controller
 		self.t = 0
 		self.cur_step = 0
+		self.cur_step += self.initial_waiting_steps
+
 		self.t_set_down = 0
 
 		# time controller
@@ -102,21 +112,31 @@ class HRL_gym(gym.Env):
 
 
 		# wave and motion
-		self.rel_motion_sc_t, self.rel_motion_sc = self.resp.make_time_trace(self.max_eps_num_step + 200, self.dt)
-		cur_motion_s = self.rel_motion_sc[self.initial_waiting_steps - 1:self.predicting_steps]
+		self.rel_motion_sc_t, self.rel_motion_sc = self.resp.make_time_trace(self.max_eps_num_step + 1000, self.dt)
+		# cur_motion_s = self.rel_motion_sc[self.initial_waiting_steps - 1:self.predicting_steps]
+		pred0 = self.rel_motion_sc[self.initial_waiting_steps:self.initial_waiting_steps+self.predicting_steps+1]
+
 
 		# states
 		# first two elements are margin to right and left
-		self.state[0, self.initial_waiting_steps - 1] = self.cur_d_sb
-		self.state[0, self.initial_waiting_steps] = self.cur_d_blimit
+		# self.state[0, self.initial_waiting_steps - 1] = self.cur_d_sb
+		# self.state[0, self.initial_waiting_steps] = self.cur_d_blimit
+		self.state[0, 0] = self.cur_d_sb
+		self.state[0, 1] = self.cur_d_blimit
 
 		# prediction of right margin
-		self.state[0, self.initial_waiting_steps + 1:self.predicting_steps + 2] = \
-			self.cur_d_sb - (self.rel_motion_sc[1:self.predicting_steps + 1] - cur_motion_s[0])
+		# self.state[0, self.initial_waiting_steps + 1:self.predicting_steps + 2] = \
+		# 	self.cur_d_sb - (self.rel_motion_sc[1:self.predicting_steps + 1] - cur_motion_s[0])
+
+		self.state[0, 2:self.predicting_steps + 2] =\
+			self.cur_d_sb - (pred0[1:] - pred0[0])
 
 		# prediction of left margin
+		# self.state[0, self.predicting_steps + 2:] = \
+		# 	self.cur_d_blimit + (self.rel_motion_sc[1:self.predicting_steps + 1] - cur_motion_s[0])
+
 		self.state[0, self.predicting_steps + 2:] = \
-			self.cur_d_blimit + (self.rel_motion_sc[1:self.predicting_steps + 1] - cur_motion_s[0])
+			self.cur_d_blimit + (pred0[1:] - pred0[0])
 
 		self.state = np.reshape(self.state, [1, self.state.shape[1]])
 
@@ -152,27 +172,31 @@ class HRL_gym(gym.Env):
 			if goal_int < self.num_survival_modes:
 				# full-speed down game
 				if not self.goal_completed:
-					reward = min(0.5 * 1 / np.abs(self.cur_d_sb), 10)
+					reward = min(10 * 1 / np.abs(self.cur_d_sb), 10)
 				if self.goal_over:
 					reward = -100
+					# reward = 0
 			else:
 				# following game
 				if not self.goal_completed:
 					reward = min(0.1 * 2 / np.abs(self.cur_d_sb - self.cur_d_blimit), 10)
 				if self.goal_over:
 					reward = -100
+					# reward = 0
+
 		else:
 			# set-down game
 			if self.goal_completed:
 				vel = (self.prev_d_sb - self.cur_d_sb) / self.dt
-				if 0 < vel < 0.5:  # good one
+				self.final_imp_vel = vel
+				if 0 < vel < 0.3:  # good one
 					reward = 10 * 1 / vel
-					self.final_imp_vel = vel
 					# if vel < 0.2:
 					# 	self.plot(show_motion=True)
 				else:
 					reward = -30
 			if self.goal_over:
+				# reward = 0
 				reward = -100
 		return reward
 
@@ -188,7 +212,8 @@ class HRL_gym(gym.Env):
 
 		if self.goal_completed:
 			"""only measures if goal has been completed"""
-			reward += 1
+			# reward += 1
+			reward += min(1 / np.abs(self.cur_d_sb), 2)
 		return reward
 
 	def is_goal_over(self):
@@ -201,7 +226,12 @@ class HRL_gym(gym.Env):
 				self.goal_cur_step = 0
 		if not self.intp_goal():
 			# for set-down
-			if self.cur_step >= self.max_goal_num_step or self.cur_d_blimit < 0:
+			# uncomment is we use both margins for set-down game
+			# if self.cur_step >= self.max_goal_num_step or self.cur_d_blimit < 0:
+
+			# TODO: important changes, probably need re-train
+			# if self.cur_step >= self.max_goal_num_step:
+			if self.goal_cur_step >= self.max_goal_num_step:
 				goal_over = True
 				self.goal_cur_step = 0
 		self.goal_over = goal_over
@@ -280,14 +310,25 @@ class HRL_gym(gym.Env):
 
 		# prepare the transition for return
 		# compute the next state after taking action at current state
-		pred = self.rel_motion_sc[self.cur_step:self.cur_step + self.predicting_steps + 1]
+		if self.use_AR:
+			pred = toolkit.computeAR(data=np.reshape(self.rel_motion_sc[
+			                                         self.cur_step - self.initial_waiting_steps:self.cur_step],
+			                                         (1, self.initial_waiting_steps, 1)),
+			                         pred_len=self.predicting_steps + 1)
+		else:
+			pred = self.rel_motion_sc[self.cur_step:self.cur_step + self.predicting_steps + 1]
 
 		# first and second elements are margins to both sides
-		self.state[0, self.initial_waiting_steps - 1] = self.cur_d_sb
-		self.state[0, self.initial_waiting_steps] = self.cur_d_blimit
+		# self.state[0, self.initial_waiting_steps - 1] = self.cur_d_sb
+		# self.state[0, self.initial_waiting_steps] = self.cur_d_blimit
+		self.state[0, 0] = self.cur_d_sb
+		self.state[0, 1] = self.cur_d_blimit
 
 		# changes of both margins
-		self.state[0, self.initial_waiting_steps + 1:self.predicting_steps + 2] = self.cur_d_sb - (pred[1:] - pred[0])
+		# self.state[0, self.initial_waiting_steps + 1:self.predicting_steps + 2] = self.cur_d_sb - (pred[1:] - pred[0])
+		# self.state[0, self.predicting_steps + 2:] = self.cur_d_blimit + (pred[1:] - pred[0])
+
+		self.state[0, 2:self.predicting_steps + 2] = self.cur_d_sb - (pred[1:] - pred[0])
 		self.state[0, self.predicting_steps + 2:] = self.cur_d_blimit + (pred[1:] - pred[0])
 
 		intrinsic_reward = self.get_intrinsic_reward()
@@ -344,7 +385,7 @@ class HRL_gym(gym.Env):
 			plt.axvline(x=self.t_set_down)
 			plt.xlabel('time(s)')
 			plt.ylabel('distance (m)')
-			plt.title("impact_velocity %.3f m/s" % self.final_imp_vel)
+			# plt.title("impact_velocity %.3f m/s" % self.final_imp_vel)
 			plt.legend(['motion_block', 'motion_barge','limit'])
 			plt.pause(3)
 			plt.close()

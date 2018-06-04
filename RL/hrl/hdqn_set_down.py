@@ -55,6 +55,7 @@ def create_deep_model(input_shape, num_outputs, act_func='relu'):
 
 	return model
 
+
 def save_scalar(step, name, value, writer):
 	"""Save a scalar value to tensorboard.
 
@@ -306,8 +307,12 @@ class HQNAgent:
 	             meta_controller_dir=None,
 	             exp_name='None',
 	             save_freq=SAVE_FREQ,
-	             set_down_model_dir = None
+	             set_down_model_dir = None,
+	             fit_env = None
 	             ):
+
+		# env setup:
+		self.fit_env = fit_env
 
 		# agent's description
 		self.state_shape = state_shape
@@ -355,13 +360,17 @@ class HQNAgent:
 		                                  model_dir=meta_controller_dir,
 		                                  exp_name=self.exp_name)
 
-		self.set_down_model = Sequential()
-		self.set_down_model.add(Flatten(input_shape=(1,) + (26,)))
-		self.set_down_model.add(Dense(100))
-		self.set_down_model.add(Activation('sigmoid'))
-		self.set_down_model.add(Dense(13))
-		self.set_down_model.add(Activation('linear'))
-		self.set_down_model.load_weights(set_down_model_dir)
+		if set_down_model_dir:
+			# prepare external set-down module
+			self.set_down_model = Sequential()
+			self.set_down_model.add(Flatten(input_shape=(1,) + (2*(self.fit_env.predicting_steps+1),)))
+			# self.set_down_model.add(Flatten(input_shape=(1,) + (22,)))
+
+			self.set_down_model.add(Dense(100))
+			self.set_down_model.add(Activation('sigmoid'))
+			self.set_down_model.add(Dense(self.num_actions))
+			self.set_down_model.add(Activation('linear'))
+			self.set_down_model.load_weights(set_down_model_dir)
 
 		# tensorbboard logistics
 		self.sess = tf.Session()
@@ -510,7 +519,11 @@ class HQNAgent:
 						action, _ = self.controller.select(policy=self.controller.training_policy,
 						                                   state=[state, proc_goal], num_update=goal_num_samples[goal])
 					else:
-						q_values = self.set_down_model.predict(state)
+						# state_set_down = [state[0][0]]
+						# state_set_down.extend(state[0][2:env.predicting_steps + 2])
+						# state_set_down = np.reshape(state_set_down, (1, 1, env.predicting_steps + 1))
+						state_set_down = np.reshape(state,(1,1,2*(env.predicting_steps+1)))
+						q_values = self.set_down_model.predict(state_set_down)
 						action = np.argmax(q_values)
 
 					# apply the action to the environment, get reward and nextstate
@@ -578,20 +591,24 @@ class HQNAgent:
 					selected_goal.append(goal)
 
 					if goal == self.num_goals - 1: # goal is set-down
-						setattr(env, 't_set_down', env.cur_step)
+						setattr(env, 't_set_down', env.cur_step-env.initial_waiting_steps)
 						setattr(env, 'height_set_down', env.cur_d_sb)
 
 			save_scalar(self.num_train_episodes,'Total extrinsic reward', total_extrin_eps, self.writer)
 			save_scalar(self.num_train_episodes, 'Episode mean Q', float(np.mean(mean_q)), self.writer)
+			save_scalar(self.num_train_episodes, 'Num of selected goal', len(selected_goal), self.writer)
+			save_scalar(self.num_train_episodes, 'Length episode', env.cur_step-env.initial_waiting_steps, self.writer)
 			if env.height_set_down:
-				save_scalar(self.num_train_episodes, 'Moment of set-down', float(env.t_set_down/env.cur_step), self.writer)
+				save_scalar(self.num_train_episodes, 'Moment of set-down', float(env.t_set_down/(
+					env.cur_step-env.initial_waiting_steps)),
+				                                                                 self.writer)
 				save_scalar(self.num_train_episodes, 'Height of set-down',  env.height_set_down, self.writer)
 
 			print('Num update: {0}, Training episode: {1}, Impact_vel: {2},Total Reward: {3}, Mean_q: {4}'.format(
 				self.metacontroller.num_updates, self.num_train_episodes, env.final_imp_vel, total_extrin_eps,
 				np.mean(mean_q)))
 
-	def evaluate(self, env, num_episodes):
+	def evaluate(self, env, num_episodes, save_tensorboard = False):
 		"""
 		Evaluate the performance of the agent in the environment.
 		Parameters
@@ -628,15 +645,29 @@ class HQNAgent:
 				# new goal
 				while True:
 
+					# if goal != self.num_goals + 1:
+
+					# uncomment if you want to use extra skill
 					if goal != self.num_goals - 1:
+
 						# select next action given the current goal and state, individual epsilon for each goal
 						action, _ = self.controller.select(policy=self.controller.training_policy,
 						                                   state=[state, proc_goal])
 
 					else:
-						state_set_down = [state[0][0]]
-						state_set_down.extend(state[0][2:27])
-						state_set_down = np.reshape(state_set_down,(1,1,26))
+						# state_set_down = [state[0][0]]
+
+						#temp
+						# state_set_down.extend([state[0][1]])
+
+						# # state_set_down.extend(state[0][2:env.predicting_steps+2])
+						# state_set_down.extend(state[0][2:12])
+
+						# state_set_down.extend(state[0][27:37])
+
+						# state_set_down = np.reshape(state_set_down,(1,1,22))
+						# # state_set_down = np.reshape(state_set_down, (1, 1, env.predicting_steps+1))
+						state_set_down = np.reshape(state, (1, 1, 2*(env.predicting_steps+1)))
 						q_values = self.set_down_model.predict(state_set_down)
 						action = np.argmax(q_values)
 
@@ -657,14 +688,24 @@ class HQNAgent:
 
 				if is_eps_over or is_eps_completed:
 					# start new episode
+					# print(selected_goal)
+					# print(env.height_set_down)
 					if is_eps_completed:
 						print("Evl episode:{0}, imp_vel:{1}, total reward: {2}".format(episode_idx,
 						                                                               env.final_imp_vel, total_reward))
-						print(selected_goal)
-						print('height of set-down: {0}'.format(env.height_set_down))
-						if env.final_imp_vel: imp_vels.append(env.final_imp_vel)
+						if env.final_imp_vel:
+							imp_vels.append(env.final_imp_vel)
+							# env.plot(show_motion=True)
+							if save_tensorboard:
+								save_scalar(episode_idx, 'Testing Reward', total_reward, self.writer)
+								save_scalar(episode_idx, 'Testing Velocity ', env.final_imp_vel, self.writer)
+								save_scalar(episode_idx, 'Testing height of set-down', env.height_set_down,
+								            self.writer)
+								save_scalar(episode_idx, 'Testing moment of set-down', float(env.t_set_down/env.cur_step),
+								            self.writer)
 					else:
 						print("Evl episode:{0} fail".format(episode_idx))
+						# env.plot(show_motion=True)
 					break
 				else:
 					# select next goal
@@ -673,10 +714,9 @@ class HQNAgent:
 					setattr(env, 'goal', proc_goal)
 					selected_goal.append(goal)
 					if goal == 6:
-						setattr(env, 't_set_down', env.cur_step)
+						setattr(env, 't_set_down', env.cur_step-env.initial_waiting_steps)
 						setattr(env, 'height_set_down', env.cur_d_sb)
+
 		print("mean vel: {0}, std: {1}".format(np.mean(imp_vels),np.std(imp_vels)))
 		print("Completed: {0}, fail: {1}".format(len(imp_vels), num_episodes-len(imp_vels)))
-		# update the tensorboard logistics
-		# save_scalar(self.num_train_episodes, 'Testing Total Reward', total_reward, self.writer)
-		# save_scalar(self.num_train_episodes, 'Testing Episode Length ', episode_length / num_episodes, self.writer)
+

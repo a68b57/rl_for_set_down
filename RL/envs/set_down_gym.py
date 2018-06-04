@@ -5,6 +5,7 @@ from matplotlib import pyplot as plt
 import matplotlib.animation as animation
 from gym.utils import seeding
 import spec_tools.spec_tools as st
+import RNN.toolkit as toolkit
 
 
 class SetDown_gym(gym.Env):
@@ -15,7 +16,7 @@ class SetDown_gym(gym.Env):
 		self.init_h_s_ct = 5
 		self.init_hoist_len = 4
 		self.cur_limit = None
-		self.init_limit = self.init_h_s_ct - self.init_hoist_len + 1.5
+		self.init_limit = self.init_h_s_ct - self.init_hoist_len + 3
 		# self.init_limit = self.init_h_s_ct - self.init_hoist_len + 5
 		# self.init_limit = self.init_h_s_ct - self.init_hoist_len + 10
 
@@ -26,10 +27,17 @@ class SetDown_gym(gym.Env):
 		self.lifting_speed = 12 / 60
 		self.num_action = 13
 		self.dt = 0.2
-		self.timeout = 200
-		self.hit_steps = 5
+		self.timeout = 20
+		self.hit_steps = 20
 
-		self.num_step = int(np.ceil(self.timeout / self.dt)) + 1
+		self.obs_len = 0.2
+		# self.initial_waiting_steps = int(self.obs_len / self.dt)  # waiting time for the first observation
+		self.initial_waiting_steps = 600  # initial waiting time for using AR
+
+		self.pred_len = 2
+		self.predicting_steps = int(self.pred_len / self.dt)
+
+		self.num_step = int(np.ceil(self.timeout / self.dt)) + 1 + self.initial_waiting_steps
 		self.cur_step = None
 		self.t = None
 
@@ -38,15 +46,12 @@ class SetDown_gym(gym.Env):
 
 		self.seed()
 
-		self.obs_len = 0.2
-		self.initial_waiting_steps = int(self.obs_len / self.dt) # waiting time for the first observation
-		self.pred_len = 2
-		self.predicting_steps = int(self.pred_len / self.dt)
+		self.use_AR = False
 
 		self.rel_motion_sc = None
 		self.rel_motion_sc_t = None
 
-		self.resp = st.Spectrum.from_synthetic(spreading=None, Hs=1.5, Tp=15)
+		self.resp = st.Spectrum.from_synthetic(spreading=None, Hs=2, Tp=7)
 		self.rel_motion_sc_t, self.rel_motion_sc = self.resp.make_time_trace(self.num_step + 200, self.dt)
 
 		self.cur_d_sb = None # current distance between supply boat and block (margin for the right)
@@ -54,10 +59,10 @@ class SetDown_gym(gym.Env):
 		self.prev_d_sb = None
 		self.cur_hoist_length = None
 
-		# self.high_limit = (self.init_h_s_ct - self.init_hoist_len + 10) * np.ones(
-		# 	2 * (int(self.obs_len / self.dt) + int(self.pred_len / self.dt)))
 		self.high_limit = (self.init_h_s_ct - self.init_hoist_len + 10) * np.ones(
-			1 * (int(self.obs_len / self.dt) + int(self.pred_len / self.dt)))
+			2 * (int(self.obs_len / self.dt) + int(self.pred_len / self.dt)))
+		# self.high_limit = (self.init_h_s_ct - self.init_hoist_len + 10) * np.ones(
+		# 	1 * (int(self.obs_len / self.dt) + int(self.pred_len / self.dt)))
 		self.action_space = spaces.Discrete(self.num_action)
 		self.observation_space = spaces.Box(-self.high_limit, high=self.high_limit, dtype=np.float16)
 		self.state = np.zeros([self.high_limit.shape[0]])
@@ -72,6 +77,10 @@ class SetDown_gym(gym.Env):
 		return [seed]
 
 	def reset(self):
+		# random initial position
+		# self.init_h_s_ct = 3.5
+		# self.init_hoist_len = 3*np.random.rand()
+
 		self.hoist_len_track = []
 		self.d_sb_track = []
 		self.d_blimit_track = []
@@ -85,34 +94,60 @@ class SetDown_gym(gym.Env):
 		self.sum_reward = 0
 		self.cur_limit = self.init_limit
 
-		self.rel_motion_sc_t, self.rel_motion_sc = self.resp.make_time_trace(self.num_step + 200, self.dt)
-		cur_motion_s = self.rel_motion_sc[self.initial_waiting_steps-1:self.predicting_steps]
+		self.cur_step += self.initial_waiting_steps
+		self.t += round(self.cur_step * self.dt, 2)
+
+		self.rel_motion_sc_t, self.rel_motion_sc = self.resp.make_time_trace(self.num_step + 1000, self.dt)
+		# pred0 = self.rel_motion_sc[self.initial_waiting_steps-1:self.predicting_steps]
+		pred0 = self.rel_motion_sc[self.initial_waiting_steps:self.initial_waiting_steps+self.predicting_steps+1]
+
+
+		# prediction by AR
+		AR_prediction = toolkit.computeAR(data=np.reshape(self.rel_motion_sc[0:self.initial_waiting_steps],
+		                                                  (1,self.initial_waiting_steps,1)),
+		                                  pred_len=self.predicting_steps+1)
 
 		# first two elements are margin to right and left
-		self.state[self.initial_waiting_steps - 1] = self.cur_d_sb
+		# self.state[self.initial_waiting_steps - 1] = self.cur_d_sb
+		self.state[0] = self.cur_d_sb
+		self.state[1] = self.cur_d_blimit
 
 		# comment for both margin
-		self.state[self.initial_waiting_steps :self.predicting_steps + 1] =\
-				self.cur_d_sb - (self.rel_motion_sc[1:self.predicting_steps + 1] - cur_motion_s[0])
+
+		if not self.use_AR:
+			# real wave
+			# self.state[1:self.predicting_steps + 1] =\
+			# 		self.cur_d_sb - (pred0[1:] - pred0[0])
+
+			self.state[2:self.predicting_steps + 2] = self.cur_d_sb - (pred0[1:] - pred0[0])
+			self.state[self.predicting_steps + 2:] = self.cur_d_blimit + (pred0[1:] - pred0[0])
+		else:
+			# predicted wave by AR
+			# self.state[1:self.predicting_steps + 1] =\
+			# 	self.cur_d_sb - (AR_prediction[1:] - AR_prediction[0])
+
+			self.state[2:self.predicting_steps + 2] = self.cur_d_sb - (AR_prediction[1:] - AR_prediction[0])
+			self.state[self.predicting_steps + 2:] = self.cur_d_blimit + (AR_prediction[1:] - AR_prediction[0])
+
 
 		# uncomment for both margin
 		# self.state[self.initial_waiting_steps] = self.cur_d_blimit
 
 		#prediction of right margin (old)
-		# self.state[self.initial_waiting_steps:self.predicting_steps+1] = self.cur_d_sb + (self.rel_motion_sc[0]-cur_motion_s)
+		# self.state[self.initial_waiting_steps:self.predicting_steps+1] = self.cur_d_sb + (self.rel_motion_sc[0]-pred0)
 
 		#prediction of left margin (old)
-		# self.state[self.predicting_steps + 2:] = self.cur_d_blimit + (self.rel_motion_sc[1:self.predicting_steps+1]-cur_motion_s)
+		# self.state[self.predicting_steps + 2:] = self.cur_d_blimit + (self.rel_motion_sc[1:self.predicting_steps+1]-pred0)
 
 
 		# uncomment for both margin mode
 		# prediction of right margin
 		# self.state[self.initial_waiting_steps + 1:self.predicting_steps + 2] =\
-		# 	self.cur_d_sb - (self.rel_motion_sc[1:self.predicting_steps + 1] - cur_motion_s[0])
+		# 	self.cur_d_sb - (self.rel_motion_sc[1:self.predicting_steps + 1] - pred0[0])
 
 		# prediction of left margin
 		# self.state[self.predicting_steps + 2:] =\
-		# 	self.cur_d_blimit + (self.rel_motion_sc[1:self.predicting_steps + 1] - cur_motion_s[0])
+		# 	self.cur_d_blimit + (self.rel_motion_sc[1:self.predicting_steps + 1] - pred0[0])
 
 		self.state = np.reshape(self.state, [self.state.shape[0], ])
 		return np.array(self.state)
@@ -127,14 +162,16 @@ class SetDown_gym(gym.Env):
 				if 0 < vel < 0.3: # good one
 					reward = 10*1/vel
 					self.final_imp_vel = vel
+					if vel < 0.05:
+						self.plot(show_motion=True)
 				else: # bad one
 					reward = -30
 					# reward = 0
-			# if self.cur_d_sb > self.cur_limit: # hit boundary
-			# 	reward = -30
+			if self.cur_d_sb > self.cur_limit: # hit boundary
+				reward = -20
 
-		if not gameover:
-			reward = -0.01
+		# if not gameover:
+		# 	reward = -0.01
 		self.sum_reward += reward
 
 		return reward
@@ -142,8 +179,10 @@ class SetDown_gym(gym.Env):
 	def if_gameover(self):
 
 		gameover = False
-
+		# uncomment for both margins
 		if self.cur_d_sb < 0 or self.cur_step == self.num_step or self.cur_d_sb > self.cur_limit:
+		# if self.cur_d_sb < 0 or self.cur_step == self.num_step:
+
 			gameover = True
 		return gameover
 
@@ -160,14 +199,6 @@ class SetDown_gym(gym.Env):
 			self.hoist_len_track.append(hoist_len)
 			self.d_sb_track.append(d_sb)
 			self.d_blimit_track.append(self.cur_d_blimit)
-
-			# if action == 1: # right
-			# 	hoist_len = hoist_len + self.lowering_speed * self.dt
-			#
-			# elif action == 2: # left
-			# 	hoist_len = max(hoist_len - self.lifting_speed * self.dt, 0)
-			# else:
-			# 	pass
 
 			speed = (action-int((self.num_action-1)//2))/30
 			hoist_len = max(hoist_len + speed * self.dt, 0)
@@ -189,18 +220,38 @@ class SetDown_gym(gym.Env):
 			self.cur_step += 1
 			self.t = round(self.cur_step * self.dt, 2)
 
-		pred = self.rel_motion_sc[self.cur_step:self.cur_step + self.predicting_steps+1]
+		if self.use_AR:
+			pred = toolkit.computeAR(data=np.reshape(self.rel_motion_sc[
+			                                            self.cur_step-self.initial_waiting_steps:self.cur_step],
+			                                                  (1,self.initial_waiting_steps,1)),
+			                                  pred_len=self.predicting_steps+1)
 
-		self.state[self.initial_waiting_steps - 1] = self.cur_d_sb
+		else:
+			pred = self.rel_motion_sc[self.cur_step:self.cur_step + self.predicting_steps + 1]
+
+		# self.state[self.initial_waiting_steps - 1] = self.cur_d_sb
+		self.state[0] = self.cur_d_sb
+		self.state[1] = self.cur_d_blimit
+
 
 		# comment for both margin mode
-		self.state[self.initial_waiting_steps :self.predicting_steps + 1] = self.cur_d_sb - (pred[0] - pred[1:])
+
+		# this setting is wrong
+		# self.state[self.initial_waiting_steps :self.predicting_steps + 1] = self.cur_d_sb - (pred[0] - pred[1:])
+
+		# this setting is used for training 23,4
+		# self.state[self.initial_waiting_steps :self.predicting_steps + 1] = self.cur_d_sb + (pred[0] - pred[1:])
+
+		# single margin
+		# self.state[1:self.predicting_steps + 1] = self.cur_d_sb - (pred[1:] - pred[0])
+
+		self.state[2:self.predicting_steps + 2] = self.cur_d_sb - (pred[1:] - pred[0])
+		self.state[self.predicting_steps + 2:] = self.cur_d_blimit + (pred[1:] - pred[0])
+
 
 		# uncomment for both margin mode
 		# self.state[self.initial_waiting_steps] = self.cur_d_blimit
-
 		# self.state[self.initial_waiting_steps+1:self.predicting_steps+2] = self.cur_d_sb - (pred[0] - pred[1:])
-
 		# self.state[self.predicting_steps + 2:] = self.cur_d_blimit + (pred[1:] - pred[0])
 
 		done = self.if_gameover()
@@ -208,6 +259,7 @@ class SetDown_gym(gym.Env):
 
 		if self.cur_limit > self.limit_min:
 			self.cur_limit *= self.limit_decay
+
 		return np.reshape(self.state, [self.state.shape[0], ]), reward, done, {}
 
 	def plot(self, show_ani=False, show_motion=False):
@@ -242,7 +294,7 @@ class SetDown_gym(gym.Env):
 
 		if show_motion:
 			fig, ax = plt.subplots()
-			ax.set_ylim([self.init_h_s_ct - h_len[-2]-0.2, self.init_h_s_ct - h_len[-2]+0.2])
+			ax.set_ylim([self.init_h_s_ct - h_len[-2]-1, self.init_h_s_ct - h_len[-2]+1])
 			x = np.linspace(0, int(self.cur_step * self.dt), len(d_sb))[-self.hit_steps:]
 			plt.plot(self.init_h_s_ct - h_len)
 			plt.plot(self.init_h_s_ct - d_sb - h_len)
@@ -251,8 +303,9 @@ class SetDown_gym(gym.Env):
 			plt.ylabel('distance (m)')
 			plt.title("impact_velocity %.3f m/s" % self.final_imp_vel)
 			plt.legend(['motion_block', 'motion_barge'])
-			plt.pause(3)
-			plt.close()
+			# plt.pause(3)
+			# plt.close()
+			plt.show()
 
 	def save_file(self, file_dir, data):
 		np.savetxt(file_dir, data, delimiter=',')
