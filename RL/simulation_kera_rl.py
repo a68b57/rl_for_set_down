@@ -13,13 +13,14 @@ from rl.policy import BoltzmannQPolicy, EpsGreedyQPolicy, LinearAnnealedPolicy
 from rl.memory import SequentialMemory
 from rl.callbacks import FileLogger, ModelIntervalCheckpoint, TestLogger
 
-ENV_NAME = 'SetDown-v1'
+# ENV_NAME = 'SetDown-v1'
 # ENV_NAME = 'Following-v1'
+ENV_NAME = 'SetDown-v2'
 
 model_dir = './model/exp22/'
 log_dir = './log/exp22/'
 
-exp_name = '23.1.2.4'
+exp_name = '24.2.1'
 
 if __name__ == "__main__":
 	env = gym.make(ENV_NAME)
@@ -29,14 +30,14 @@ if __name__ == "__main__":
 
 	model = Sequential()
 	model.add(Flatten(input_shape=(1,) + env.observation_space.shape))
-	model.add(Dense(100))
+	model.add(Dense(200))
 	model.add(Activation('sigmoid'))
 	model.add(Dense(nb_actions))
 	model.add(Activation('linear'))
 	print(model.summary())
 
 	memory = SequentialMemory(limit=50000, window_length=1)
-	policy = LinearAnnealedPolicy(EpsGreedyQPolicy(), attr='eps', value_max=0.5, value_min=0.1, value_test=0,
+	policy = LinearAnnealedPolicy(EpsGreedyQPolicy(), attr='eps', value_max=0.1, value_min=0.1, value_test=0,
 	                              nb_steps=50000)
 
 	dqn = DQNAgent(model=model, nb_actions=nb_actions, memory=memory, nb_steps_warmup=10,
@@ -44,7 +45,7 @@ if __name__ == "__main__":
 
 	dqn.compile(Adam(lr=1e-3), metrics=['mse'])
 
-	dqn.load_weights(model_dir + 'following_'+'23.1.2.4'+'_weights_1300000.h5f')
+	dqn.load_weights(model_dir + 'following_'+'24.2'+'_weights_1500000.h5f')
 
 	# weights_filename = model_dir + 'following_{}_weights.h5f'.format(exp_name)
 	# checkpoint_weights_filename = model_dir + 'following_' + exp_name + '_weights_{step}.h5f'
@@ -52,5 +53,5 @@ if __name__ == "__main__":
 	# callbacks = [ModelIntervalCheckpoint(checkpoint_weights_filename, interval=100000)]
 	# callbacks += [FileLogger(log_filename, interval=1)]
 
-	# dqn.fit(env, nb_steps=1500000, visualize=False, verbose=2, callbacks=callbacks)
+	# dqn.fit(env, nb_steps=3000000, visualize=False, verbose=2, callbacks=callbacks)
 	dqn.test(env, nb_episodes=500, visualize=False)

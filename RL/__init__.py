@@ -28,3 +28,9 @@ register(
     id='HRL-v0',
     entry_point='RL.envs:HRL_gym',
 )
+
+
+register(
+    id='SetDown-v2',
+    entry_point='RL.envs:SetDown_reimpact_gym',
+)
