@@ -13,6 +13,8 @@ from rl.policy import BoltzmannQPolicy, EpsGreedyQPolicy, LinearAnnealedPolicy
 from rl.memory import SequentialMemory
 from rl.callbacks import FileLogger, ModelIntervalCheckpoint, TestLogger
 
+from RL.tools import MCTS
+
 # ENV_NAME = 'SetDown-v1'
 # ENV_NAME = 'Following-v1'
 ENV_NAME = 'SetDown-v2'
@@ -24,6 +26,7 @@ exp_name = '24.2.1'
 
 if __name__ == "__main__":
 	env = gym.make(ENV_NAME)
+	env_MCTS = gym.make(ENV_NAME)
 	np.random.seed(123)
 	env.seed(123)
 	nb_actions = env.action_space.n
@@ -54,4 +57,4 @@ if __name__ == "__main__":
 	# callbacks += [FileLogger(log_filename, interval=1)]
 
 	# dqn.fit(env, nb_steps=3000000, visualize=False, verbose=2, callbacks=callbacks)
-	dqn.test(env, nb_episodes=500, visualize=False)
+	dqn.test(env=env, mcts_env=env_MCTS, nb_episodes=800, visualize=False)
