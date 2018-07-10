@@ -1,0 +1,86 @@
+%
+%
+%
+%
+%****************************************************************************************************
+%     Static LoadCases 
+%****************************************************************************************************
+%
+%----------------------------------------------------------------------------------------------------
+Load Case 1 Name                     = static equilibrium 
+%----------------------------------------------------------------------------------------------------
+%----------------------------------------------------------------------------------------------------
+%
+%
+%
+%
+%
+%****************************************************************************************************
+%     View Data of ModeShapes 
+%****************************************************************************************************
+%
+Mode Shape Number                     = 7 
+Mode Shape 7 Scale Factor             = 11.000000 
+%
+Mode Shape Print Title                = Mode Shape #number# 
+Mode Shape Print SubTitle1            = Tn: #period# s. 
+Mode Shape Print SubTitle2            =  
+Mode Shape Print Project              = #project# 
+Mode Shape Print Subject              = #subject# 
+Mode Shape Print JobNo                = #jobno# 
+Mode Shape Print Date                 = #today# 
+Mode Shape Print Figure               = #number# 
+%
+Mode Shape Plot Bodies                = [1, 0, 0, 0] 
+Mode Shape Plot Points                = [1, 0] 
+Mode Shape Plot Connectors            = [1, 0] 
+Mode Shape Plot Joints                = [1, 0] 
+Mode Shape Plot Forces                = [0, 0] 
+%----------------------------------------------------------------------------------------------------
+%
+%
+%
+%****************************************************************************************************
+%     View Data of UnConstrained Modes 
+%****************************************************************************************************
+%
+Unconstrained Mode Print Title        = UnConstrained Mode #number# 
+Unconstrained Mode Print SubTitle1    =  
+Unconstrained Mode Print SubTitle2    =  
+Unconstrained Mode Print Project      = #project# 
+Unconstrained Mode Print Subject      = #subject# 
+Unconstrained Mode Print JobNo        = #jobno# 
+Unconstrained Mode Print Date         = #today# 
+Unconstrained Mode Print Figure       = #number# 
+%----------------------------------------------------------------------------------------------------
+%
+%
+%
+%****************************************************************************************************
+%     View Data of Static Response 
+%****************************************************************************************************
+%
+Static Response Print Title           = Static Response #number# 
+Static Response Print SubTitle1       = Load Case: #loadcase# 
+Static Response Print SubTitle2       =  
+Static Response Print Project         = #project# 
+Static Response Print Subject         = #subject# 
+Static Response Print JobNo           = #jobno# 
+Static Response Print Date            = #today# 
+Static Response Print Figure          = #number# 
+%
+Static Response Plot Bodies           = [1, 0, 0, 0] 
+Static Response Plot Points           = [1, 0] 
+Static Response Plot Connectors       = [1, 0] 
+Static Response Plot Joints           = [1, 0] 
+Static Response Plot Forces           = [0, 0] 
+%----------------------------------------------------------------------------------------------------
+%
+%
+%
+%****************************************************************************************************
+%     Print Command Queue 
+%****************************************************************************************************
+%
+%----------------------------------------------------------------------------------------------------
+%

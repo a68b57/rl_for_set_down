@@ -34,3 +34,8 @@ register(
     id='SetDown-v2',
     entry_point='RL.envs:SetDown_reimpact_gym',
 )
+
+register(
+    id='SetDown-v3',
+    entry_point='RL.envs:SetDown_2d_gym',
+)

@@ -14,6 +14,8 @@ class SetDown_reimpact_gym(Env):
 
 		self.init_h_b_ct = 10  # initial distance between crane tip to barge
 		self.init_hoist_len = 7 # initial hoist length of aux block
+		# self.init_hoist_len = 9 # initial hoist length of aux block
+
 		self.cur_limit = None # current limit on distance
 		self.init_limit = self.init_h_b_ct - self.init_hoist_len + 3
 		self.limit_decay = 0.998
@@ -31,9 +33,11 @@ class SetDown_reimpact_gym(Env):
 		# self.initial_waiting_steps = 600  # initial waiting time for using AR
 		self.initial_waiting_steps = 0  # initial waiting time for using AR
 
-		self.pred_len = 15 # agent sees the actual change of distance for 15 second (appr. 2 cycles)
+		# self.pred_len = 15 # agent sees the actual change of distance for 15 second (appr. 2 cycles)
+		self.pred_len = 10 # agent sees the actual change of distance for 15 second (appr. 2 cycles)
 		self.predicting_steps = int(self.pred_len / self.dt)
-		self.num_input_wave_height = 8 # agent also sees the peak (crest and though) of rest 8 cycles
+		# self.num_input_wave_height = 8 # agent also sees the peak (crest and though) of rest 8 cycles
+		self.num_input_wave_height = 0 # agent also sees the peak (crest and though) of rest 8 cycles
 
 		self.num_step = int(np.ceil(self.timeout / self.dt)) + 1 + self.initial_waiting_steps # total steps for the
 		self.reimpact_step = 300
@@ -49,9 +53,12 @@ class SetDown_reimpact_gym(Env):
 
 		# load RAO, get response
 		self.wave = st.Spectrum.from_synthetic(spreading=None, Hs=1.5, Tp=8)
-		self.relative_RAO = st.Rao.from_liftdyn('./RAO/relative_motion.stf_plt', 1, 1)
+		self.relative_RAO = st.Rao.from_liftdyn('/home/michael/Desktop/workspace/rl_for_set_down/RL/RAO/relative_motion.stf_plt', 1, 1)
 		self.resp = self.relative_RAO.get_response(self.wave)
-		self.rel_motion_b_ct_t, self.rel_motion_b_ct = self.resp.make_time_trace(self.num_step + 3000, self.dt)
+		temp = self.resp.make_time_trace(self.num_step + 3000, self.dt)
+
+		self.rel_motion_b_ct_t = temp['t']
+		self.rel_motion_b_ct = temp['response']
 
 		## instant variables
 		self.cur_step = None # current step of the episode (will include initial waiting time)
@@ -125,7 +132,9 @@ class SetDown_reimpact_gym(Env):
 		self.cur_t += round(self.cur_step * self.dt, 2)
 
 		# generate the time trace of changes of distance between crane tip and barge
-		self.rel_motion_b_ct_t, self.rel_motion_b_ct = self.resp.make_time_trace(self.num_step+3000, self.dt)
+		temp = self.resp.make_time_trace(self.num_step+3000, self.dt)
+		self.rel_motion_b_ct_t = temp['t']
+		self.rel_motion_b_ct = temp['response'][0]
 		pred0 = self.rel_motion_b_ct[self.cur_step:self.cur_step + self.predicting_steps]
 		peaks = self.rel_motion_b_ct[self.cur_step + self.predicting_steps:self.cur_step+self.predicting_steps+1000]
 		all_wave_heights = wavetool.return_wave_heights(peaks)
@@ -198,7 +207,6 @@ class SetDown_reimpact_gym(Env):
 
 		return np.array(self.state)
 
-
 	def get_extra_payout(self, start):
 		vel = -np.linspace(self.cur_speed, self.max_speed, (self.max_speed-self.cur_speed)/(self.accel*self.dt)+1)
 		x = np.linspace(0, int(self.reimpact_step*self.dt)-self.dt, self.reimpact_step)
@@ -213,20 +221,12 @@ class SetDown_reimpact_gym(Env):
 
 	def is_reimpact(self):
 		yb = - self.rel_motion_b_ct[self.cur_step: self.cur_step+self.reimpact_step]
-		# slope = np.arange(self.cur_speed, self.max_speed, self.accel)
-		# yc = self.get_extra_payout(-self.max_speed, self.cur_d_cb + yb[0], 60, self.dt)
 		yc = self.get_extra_payout(self.cur_d_cb + (-self.rel_motion_b_ct[self.cur_step]))
 
 		self.reimpact_b_track = yb
 		self.reimpact_c_track = yc
 
 		is_reimpact = ((yb - yc) < 0).any()
-		# if not is_reimpact:
-			# plt.plot(yb[0:75])
-			# plt.plot(yc[0:75])
-			# plt.ylim([-2, 2])
-			# plt.show()
-
 		return is_reimpact
 
 	def get_reward(self, gameover):
@@ -240,10 +240,9 @@ class SetDown_reimpact_gym(Env):
 					self.final_imp_vel = vel
 
 				else: # bad one
-					# reward = -30
+					reward = -30
 
-					# TODO: the new reward function for bad impact is temp, just for trying the MCTS
-					reward = max(-200*(vel-0.5), -99)
+					# reward = max(-200*(vel-0.5), -99)
 
 			if self.cur_d_cb > self.cur_limit: # hit boundary
 				reward = -20
@@ -252,8 +251,6 @@ class SetDown_reimpact_gym(Env):
 
 			if self.reimpact:
 				reward = -100
-
-			# print(reward)
 
 		self.sum_reward += reward
 
@@ -267,12 +264,6 @@ class SetDown_reimpact_gym(Env):
 			# if self.cur_d_sb < 0 or self.cur_step == self.num_step:
 			gameover = True
 		return gameover
-
-	# def if_agent_is_active(self):
-	# 	if self.cur_speed == 0 or self.cur_speed == self.max_speed or self.cur_speed == self.half_speed:
-	# 		self.agent_active = True
-	# 	else:
-	# 		self.agent_active = False
 
 	def get_holding_step(self, action):
 		if action == 1:
@@ -301,7 +292,7 @@ class SetDown_reimpact_gym(Env):
 			self.d_cb_track.append(d_cb)
 			self.d_climit_track.append(self.cur_d_climit)
 
-			# action=0:reduce; action=1:no action; action=2:increase
+			# action=0:reduce; action=1:no action; action=2:gas
 			# action-1 == [-1, 0, 1]
 			if self.cur_speed == self.max_speed:
 				self.cur_speed = min(self.cur_speed + (action - 1) * self.accel * self.dt, self.max_speed)
@@ -358,13 +349,8 @@ class SetDown_reimpact_gym(Env):
 
 	def plot(self, show_ani=False, show_motion=False):
 
-		# d_cb = np.array(self.d_cb_track)[-self.hit_steps:]
-		# h_len = np.array(self.hoist_len_track)[-self.hit_steps:]
-		# d_climit = np.array(self.d_climit_track)[-self.hit_steps:]
-
 		d_cb = np.array(self.d_cb_track)
 		h_len = np.array(self.hoist_len_track)
-		# d_climit = np.array(self.d_climit_track)
 		reimpact_b = self.reimpact_b_track[1:75]
 		reimpact_c = self.reimpact_c_track[1:75]
 
