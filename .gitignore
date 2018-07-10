@@ -11,3 +11,4 @@ other_packages/
 logs*/
 *.michael-XPS-15-9550
 *.csv
+*.pickle
