@@ -46,7 +46,7 @@ def main():
 	test_env = HRL_gym(init_barge_ct=INIT_BARGE_CT, init_hoist_len=INIT_HOIST_LEN, limit_decay=0.998,
 	                   limit_min=LIMIT_MIN, dt=DT, eps_timeout=EPS_TIMEOUT, goal_timeout=GOAL_TIMEOUT,
 	                   obs_len=OBS_LEN,
-	                   pred_len=PRED_LEN, hs=HS, tp=TP, num_actions=NUM_ACTIONS, num_goals=NUM_GOALS, use_AR=True,
+	                   pred_len=PRED_LEN, hs=HS, tp=TP, num_actions=NUM_ACTIONS, num_goals=NUM_GOALS, use_AR=False,
 	                   initial_waiting_step=INITIAL_WAITING_STEP)
 
 	np.random.seed(123)

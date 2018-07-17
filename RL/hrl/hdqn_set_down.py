@@ -1,7 +1,7 @@
 """Main DQN agent."""
 
 import tensorflow as tf
-from keras.layers import (Activation, Dense, Flatten, merge, Input, Multiply)
+from keras.layers import Activation, Dense, Flatten, merge, Input, Multiply
 from keras.models import Model, Sequential
 import numpy as np
 import copy

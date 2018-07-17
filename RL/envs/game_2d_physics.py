@@ -156,15 +156,15 @@ class game2d(object):
 		self.motions_302_pitch = R[4] * self.magic_pitch_factor
 
 
-		# TODO: Temp start with stationary env
-		self.motions_sway_block = np.zeros((10000,))
-		self.motions_heave_block = np.zeros((10000,))
-		self.motions_302_surge = np.zeros((10000,))
-		self.motions_302_heave = np.zeros((10000,))
-		self.motions_302_pitch = np.zeros((10000,))
+		# # TODO: Temp start with stationary env
+		# self.motions_sway_block = np.zeros((10000,))
+		# self.motions_heave_block = np.zeros((10000,))
+		# self.motions_302_surge = np.zeros((10000,))
+		# self.motions_302_heave = np.zeros((10000,))
+		# self.motions_302_pitch = np.zeros((10000,))
 
 
-		self.hoist_length = 60
+		self.hoist_length = np.random.uniform(45, 55)
 		self.crane_sway = 0
 		self.barge_impulse = []
 		self.bumper_impulse = []
@@ -173,7 +173,7 @@ class game2d(object):
 
 		self.is_done = False
 
-		initial_x = np.random.uniform(5, 9) * np.random.choice([-1, 1])
+		initial_x = np.random.uniform(10, 15) * np.random.choice([-1, 1])
 		self.load.position = Vec2d(initial_x, self.hoist_length - self.poi[1])
 		self.time_lookup_index = 0
 

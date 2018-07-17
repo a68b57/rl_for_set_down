@@ -1,8 +1,8 @@
 RNN/
-finetune/
-hrl/logs_hdqn/
-hrl/logs_controller/
-hrl/logs_metacontroller/
-memory/
-temp_backup/
+RL/finetune/
+RL/hrl/logs_hdqn/
+RL/hrl/logs_controller/
+RL/hrl/logs_metacontroller/
+RL/memory/
+RL/temp_backup/
 *.pyc

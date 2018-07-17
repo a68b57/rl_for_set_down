@@ -19,15 +19,15 @@ from RL.tools import MCTS
 
 # ENV_NAME = 'SetDown-v1'
 # ENV_NAME = 'Following-v1'
-ENV_NAME = 'SetDown-v2' # 1D
-# ENV_NAME = 'SetDown-v3' # 2D
+# ENV_NAME = 'SetDown-v2' # 1D
+ENV_NAME = 'SetDown-v3' # 2D
 
 model_dir = './model/exp22/'
 log_dir = './log/exp22/'
 
 memory_dir = './memory/'
 
-exp_name = '24.3.1'
+exp_name = '25.3.1'
 
 WINDOW_LENGTH = 1
 
@@ -66,12 +66,12 @@ if __name__ == "__main__":
 
 	# memory.deq_to_per(memory_expert_pickle)
 
-	policy = LinearAnnealedPolicy(EpsGreedyQPolicy(), attr='eps', value_max=0.5, value_min=0.05, value_test=0,
-	                              nb_steps=50000)
+	policy = LinearAnnealedPolicy(EpsGreedyQPolicy(), attr='eps', value_max=0.5, value_min=0.1, value_test=0,
+	                              nb_steps=500000)
 
 	dqn = DQNAgent(model=model, nb_actions=nb_actions, memory=memory, memory_expert=None, nb_steps_warmup=10,
 	               target_model_update=10000, policy=policy, enable_dueling_network=False, enable_double_dqn=True,
-	               max_MCTS_eps=5, use_mc=False)
+	               max_MCTS_eps=30, use_mc=False)
 
 	lr = 1e-3
 
@@ -79,7 +79,7 @@ if __name__ == "__main__":
 		lr /= 4
 	dqn.compile(Adam(lr=lr))
 
-	# dqn.load_weights(model_dir + 'following_'+'24.2.2'+'_weights_1000000.h5f')
+	# dqn.load_weights(model_dir + 'following_'+'24.2'+'_weights_1500000.h5f')
 
 	# dqn.load_weights('/home/michael/Desktop/workspace/rl_for_set_down/RL/model/dagger/exp2.h5')
 
@@ -91,7 +91,7 @@ if __name__ == "__main__":
 
 	dqn.fit(env, nb_steps=1500000, visualize=False, verbose=2, callbacks=callbacks)
 
-	# callbacks = [MemoryIntervalCheckpoint(memory_dir + exp_name + '_memory_3(dagger_memory_2)_temp.pickle',
+	# callbacks = [MemoryIntervalCheckpoint(memory_dir + 'dagger_memory_2(appending_on_24.2_with_MCTS_memory).pickle',
 	#                                       interval=1000)]
 	# dqn.test(env=env, mcts_env=env_MCTS, nb_episodes=2000, visualize=False, callbacks=callbacks)
 

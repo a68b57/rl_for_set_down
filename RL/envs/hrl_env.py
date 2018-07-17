@@ -72,7 +72,10 @@ class HRL_gym(gym.Env):
 
 		# wave and motion
 		self.resp = st.Spectrum.from_synthetic(spreading=None, Hs=hs, Tp=tp)
-		self.rel_motion_sc_t, self.rel_motion_sc = self.resp.make_time_trace(self.max_eps_num_step + 1000, self.dt)
+		temp = self.resp.make_time_trace(self.max_eps_num_step + 1000, self.dt)
+
+		self.rel_motion_sc_t = temp['t']
+		self.rel_motion_sc = temp['response']
 
 		# logging
 		self.hoist_len_track = []
@@ -112,7 +115,9 @@ class HRL_gym(gym.Env):
 
 
 		# wave and motion
-		self.rel_motion_sc_t, self.rel_motion_sc = self.resp.make_time_trace(self.max_eps_num_step + 1000, self.dt)
+		temp = self.resp.make_time_trace(self.max_eps_num_step + 1000, self.dt)
+		self.rel_motion_sc_t = temp['t']
+		self.rel_motion_sc = temp['response'][0]
 		# cur_motion_s = self.rel_motion_sc[self.initial_waiting_steps - 1:self.predicting_steps]
 		pred0 = self.rel_motion_sc[self.initial_waiting_steps:self.initial_waiting_steps+self.predicting_steps+1]
 

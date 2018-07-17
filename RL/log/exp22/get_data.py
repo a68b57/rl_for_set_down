@@ -57,18 +57,18 @@ sns.set(style="darkgrid")
 
 # d1 = np.array([])
 # d2 = np.array([])
-# # d3 = np.array([])
+# d3 = np.array([])
 #
-# sns.kdeplot(d1, label='Comb.', shade=True, color='g')
-# sns.kdeplot(d2, label='Only policy', shade=True, color='r')
-# # sns.kdeplot(d3, label='Only MCTS', shade=True)
+# sns.kdeplot(d1, label='end-end', shade=True)
+# sns.kdeplot(d2, label='hrl', shade=True, color='g')
+# sns.kdeplot(d3, label='transfer learning', shade=True, color='r')
 #
 # # label = 'mean:{:.4f}, std:{:.4f}'.format(np.mean(d1), np.std(d1))
 # # sns.kdeplot(d1, label=label, shade=True)
 #
-# plt.xlim(-0.05,0.8)
+# plt.xlim(-0.05,0.6)
 # plt.xlabel('impact velocity (m/s)')
-# plt.title('Hs:1.5, Tp:8')
+# plt.title('Hs:1.5, Tp:15, set-down from 7m')
 # plt.show()
 ###################################################
 
@@ -80,12 +80,14 @@ def running_mean(x, N):
     cumsum = np.cumsum(np.insert(x, 0, 0))
     return (cumsum[N:] - cumsum[:-N]) / float(N)
 
+cur1 = pd.read_json('following_25.2.2_log.csv')['episode_reward']
+cur2 = pd.read_json('following_25.2.2_log.csv')['mean_eps']
 
-cur1 = pd.read_json('following_24.3_log.csv')['mean_q']
-cur2 = pd.read_json('following_24.3.1_log.csv')['mean_q']
+# cur1 = pd.read_json('following_23.1.2.4_log.csv')['episode_reward']
+# cur2 = pd.read_json('following_23.1.2.3_log.csv')['episode_reward']
 
-# cur1 = pd.read_json('following_24.3_log.csv')['episode_reward']
-# cur2 = pd.read_json('following_24.3_log.csv')['mean_q']
+# cur1 = np.array([])
+# cur2 = np.array([])
 
 cur1 = running_mean(np.array(cur1), window)
 std_cur1 = np.std(cur1)
@@ -98,11 +100,11 @@ C_params = np.linspace(1, l, l)
 cur1 = cur1[0:l]
 cur2 = cur2[0:l]
 
-cur1_min = -50
-cur1_max = 100
+cur1_min = 0
+cur1_max = 1000
 
-cur2_min = -50
-cur2_max = 100
+cur2_min = 0
+cur2_max = 1
 
 sns.set_style("darkgrid")
 
@@ -122,11 +124,11 @@ par1.axis["left"].toggle(all=True)
 
 host.set_ylim(cur1_min, cur1_max)
 host.set_xlabel("episode")
-par1.set_ylabel("mean Q-value")
-host.set_ylabel("episode reward")
+par1.set_ylabel("reward")
+host.set_ylabel("mean q")
 
-p1, = host.plot(C_params, cur1,label="episode reward", color='red')
-p2, = par1.plot(C_params, cur2, label="mean Q", color='green')
+p1, = host.plot(C_params, cur1,label="total episode reward", color='red')
+p2, = par1.plot(C_params, cur2, label="mean q", color='green')
 host.fill_between(C_params, cur1 - std_cur1, cur1 + std_cur1, alpha = 0.1, color="red")
 par1.fill_between(C_params, cur2 - std_cur2, cur2 + std_cur2, alpha = 0.1, color="green")
 par1.set_ylim(cur2_min, cur2_max)
@@ -138,7 +140,7 @@ par1.axis["left"].label.set_color(p2.get_color())
 host.axis["left"].major_ticklabels.set_color(p1.get_color())
 par1.axis["left"].major_ticklabels.set_color(p2.get_color())
 
-plt.title('Initial angle ~(5-9) degree')
+plt.title('Approaching bumper')
 plt.draw()
 plt.show()
 

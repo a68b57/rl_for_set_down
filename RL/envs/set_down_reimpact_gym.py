@@ -33,11 +33,11 @@ class SetDown_reimpact_gym(Env):
 		# self.initial_waiting_steps = 600  # initial waiting time for using AR
 		self.initial_waiting_steps = 0  # initial waiting time for using AR
 
-		# self.pred_len = 15 # agent sees the actual change of distance for 15 second (appr. 2 cycles)
-		self.pred_len = 10 # agent sees the actual change of distance for 15 second (appr. 2 cycles)
+		self.pred_len = 15 # agent sees the actual change of distance for 15 second (appr. 2 cycles)
+		# self.pred_len = 5 # agent sees the actual change of distance for 15 second (appr. 2 cycles)
 		self.predicting_steps = int(self.pred_len / self.dt)
-		# self.num_input_wave_height = 8 # agent also sees the peak (crest and though) of rest 8 cycles
-		self.num_input_wave_height = 0 # agent also sees the peak (crest and though) of rest 8 cycles
+		self.num_input_wave_height = 8 # agent also sees the peak (crest and though) of rest 8 cycles
+		# self.num_input_wave_height = 0 # agent also sees the peak (crest and though) of rest 8 cycles
 
 		self.num_step = int(np.ceil(self.timeout / self.dt)) + 1 + self.initial_waiting_steps # total steps for the
 		self.reimpact_step = 300
@@ -135,6 +135,8 @@ class SetDown_reimpact_gym(Env):
 		temp = self.resp.make_time_trace(self.num_step+3000, self.dt)
 		self.rel_motion_b_ct_t = temp['t']
 		self.rel_motion_b_ct = temp['response'][0]
+
+
 		pred0 = self.rel_motion_b_ct[self.cur_step:self.cur_step + self.predicting_steps]
 		peaks = self.rel_motion_b_ct[self.cur_step + self.predicting_steps:self.cur_step+self.predicting_steps+1000]
 		all_wave_heights = wavetool.return_wave_heights(peaks)
@@ -249,6 +251,8 @@ class SetDown_reimpact_gym(Env):
 
 			self.reimpact = self.is_reimpact()
 
+
+
 			if self.reimpact:
 				reward = -100
 
@@ -356,7 +360,7 @@ class SetDown_reimpact_gym(Env):
 
 		action_list = np.array(self.action_list)
 
-		action_0 = action_list[np.where(action_list[:,1] == 0)]
+		action_0 = action_list[np.where(action_list[:, 1] == 0)]
 		action_1 = action_list[np.where(action_list[:, 1] == 1)]
 		action_2 = action_list[np.where(action_list[:, 1] == 2)]
 
