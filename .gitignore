@@ -6,4 +6,3 @@ hrl/logs_metacontroller/
 memory/
 temp_backup/
 *.pyc
-*.events.out.*
