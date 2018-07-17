@@ -5,4 +5,5 @@ RL/hrl/logs_controller/
 RL/hrl/logs_metacontroller/
 RL/memory/
 RL/temp_backup/
+RL/hrl/
 *.pyc
