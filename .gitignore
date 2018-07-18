@@ -6,3 +6,4 @@ RL/hrl/logs_metacontroller/
 RL/memory/
 RL/temp_backup/
 *.pyc
+*.xml
