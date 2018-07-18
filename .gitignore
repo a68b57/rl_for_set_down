@@ -7,3 +7,4 @@ RL/memory/
 RL/temp_backup/
 *.pyc
 *.xml
+.idea/
