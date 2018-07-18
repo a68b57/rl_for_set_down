@@ -176,9 +176,9 @@ def get_demo_data_from_seq_memory(memory):
 	demo = []
 	all_experiences = memory.sample(memory.nb_entries)
 	for e in all_experiences:
-		demo.append([np.reshape(e.state0,(85,)), e.action, e.reward, np.reshape(e.state1, (85,)), e.terminal1, 1.0,
+		demo.append([np.reshape(e.state0,(13,)), e.action, e.reward, np.reshape(e.state1, (13,)), e.terminal1, 1.0,
 		                                                                        e.reward,
-		             np.reshape(e.state1,(85,)),
+		             np.reshape(e.state1,(13,)),
 		             e.terminal1, 10])
 
 	with open(Config.DEMO_DATA_PATH, 'wb') as f:
@@ -205,7 +205,7 @@ if __name__ == '__main__':
 	np.random.seed(123)
 	env.seed(123)
 
-	# memory_file_name = '../memory/' + '24.2_with_MCTS'+'_memory.pickle'
+	# memory_file_name = '../memory/' + 'demo_25.2.2_1900000.pickle'
 	# with open(memory_file_name, 'rb') as pickle_file:
 	# 	memory = pickle.load(pickle_file)
 

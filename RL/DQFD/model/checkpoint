@@ -1,0 +1,2 @@
+model_checkpoint_path: "/home/michael/Desktop/workspace/rl_for_set_down/RL/DQFD/model/DQfD_on_25.2.2_model"
+all_model_checkpoint_paths: "/home/michael/Desktop/workspace/rl_for_set_down/RL/DQFD/model/DQfD_on_25.2.2_model"

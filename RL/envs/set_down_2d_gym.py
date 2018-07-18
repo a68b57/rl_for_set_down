@@ -52,8 +52,11 @@ class SetDown_2d_gym(Env):
 		if np.abs(theta) < 1 and np.abs(vel) < 1: # exp 25.2
 			reward = 1
 
-		if np.abs(hook_position) > 10:
-			reward += -5
+		if np.abs(hook_position) > 5:
+			reward += 5 - np.abs(hook_position)
+
+		if self.engine.hoist_length < 20:
+			reward += -1
 
 		return reward
 
@@ -91,7 +94,7 @@ class SetDown_2d_gym(Env):
 		is_terminal = False
 		# if self.tol_steps == 2000 or np.abs(hook_position[0]) > 50: # 25 and 25.1
 		state = np.abs(theta) < 1 and np.abs(vel) < 1
-		if self.tol_steps == 1500 or np.abs(hook_position) > 20:
+		if self.tol_steps == 1500 or np.abs(hook_position) > 15 or self.engine.hoist_length < 10 or self.engine.is_done:
 			is_terminal = True
 		return is_terminal
 
@@ -161,7 +164,7 @@ class SetDown_2d_gym(Env):
 		# elif action == 1:
 		# 	key = 'hold'
 		# else:
-		# 	key = 'right
+		# 	key = 'right'
 
 		# for exp 26 and 25.3
 		if action == 0:

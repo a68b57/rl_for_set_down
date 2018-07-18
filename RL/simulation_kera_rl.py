@@ -27,7 +27,7 @@ log_dir = './log/exp22/'
 
 memory_dir = './memory/'
 
-exp_name = '25.3.1'
+exp_name = '25.3.2'
 
 WINDOW_LENGTH = 1
 
@@ -66,7 +66,7 @@ if __name__ == "__main__":
 
 	# memory.deq_to_per(memory_expert_pickle)
 
-	policy = LinearAnnealedPolicy(EpsGreedyQPolicy(), attr='eps', value_max=0.5, value_min=0.1, value_test=0,
+	policy = LinearAnnealedPolicy(EpsGreedyQPolicy(), attr='eps', value_max=1, value_min=0.1, value_test=0,
 	                              nb_steps=500000)
 
 	dqn = DQNAgent(model=model, nb_actions=nb_actions, memory=memory, memory_expert=None, nb_steps_warmup=10,
@@ -79,7 +79,7 @@ if __name__ == "__main__":
 		lr /= 4
 	dqn.compile(Adam(lr=lr))
 
-	# dqn.load_weights(model_dir + 'following_'+'24.2'+'_weights_1500000.h5f')
+	# dqn.load_weights(model_dir + 'following_'+'25.3.2'+'_weights_400000.h5f')
 
 	# dqn.load_weights('/home/michael/Desktop/workspace/rl_for_set_down/RL/model/dagger/exp2.h5')
 
