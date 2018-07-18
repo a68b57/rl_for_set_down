@@ -73,15 +73,16 @@ sns.set(style="darkgrid")
 ###################################################
 
 ######show tsplot###########
-window = 300
+window = 1
 
 
 def running_mean(x, N):
     cumsum = np.cumsum(np.insert(x, 0, 0))
     return (cumsum[N:] - cumsum[:-N]) / float(N)
 
-cur1 = pd.read_json('following_25.2.2_log.csv')['episode_reward']
-cur2 = pd.read_json('following_25.2.2_log.csv')['mean_eps']
+
+cur1 = pd.read_json('following_25.3.1_log.csv')['episode_reward']
+cur2 = pd.read_json('following_25.3.1_log.csv')['mean_eps']
 
 # cur1 = pd.read_json('following_23.1.2.4_log.csv')['episode_reward']
 # cur2 = pd.read_json('following_23.1.2.3_log.csv')['episode_reward']
@@ -100,8 +101,8 @@ C_params = np.linspace(1, l, l)
 cur1 = cur1[0:l]
 cur2 = cur2[0:l]
 
-cur1_min = 0
-cur1_max = 1000
+cur1_min = -10
+cur1_max = 100
 
 cur2_min = 0
 cur2_max = 1

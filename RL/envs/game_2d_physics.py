@@ -49,7 +49,7 @@ class game2d(object):
 		self.magic_pitch_factor = 1 # for better looking physics
 
 		# initial game settings
-		self.hoist_length = 60
+		self.hoist_length = 50
 		self.crane_sway = 0
 		self.barge_impulse = []
 		self.bumper_impulse = []
@@ -164,7 +164,7 @@ class game2d(object):
 		# self.motions_302_pitch = np.zeros((10000,))
 
 
-		self.hoist_length = np.random.uniform(45, 55)
+		self.hoist_length = 50
 		self.crane_sway = 0
 		self.barge_impulse = []
 		self.bumper_impulse = []
