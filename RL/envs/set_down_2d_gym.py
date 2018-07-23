@@ -31,80 +31,89 @@ class SetDown_2d_gym(Env):
 
 		self.high_limit = np.inf * np.ones(state_len)
 		self.action_space = spaces.Discrete(5)
+		# self.action_space = spaces.Discrete(3)
 
 		self.observation_space = spaces.Box(-self.high_limit, high=self.high_limit, dtype=np.float16)
 		self.state = np.zeros([self.high_limit.shape[0]])
 		self.tol_steps = 0
 		self.engine.setup()
 
-	def get_reward(self):
-		"""this is for exp25"""
-
-		hook_position = self.state[0]
-		theta = self.state[1]
-		vel = self.state[3]
-		reward = 0
-
-		# if np.abs(theta) < 5 and np.abs(vel) < 2:
-		# 	reward = min(1/(np.abs(vel)), 5) # exp 25.1
-		#   reward = 1 # exp 25
-
-		if np.abs(theta) < 1 and np.abs(vel) < 1: # exp 25.2
-			reward = 1
-
-		if np.abs(hook_position) > 5:
-			reward += 5 - np.abs(hook_position)
-
-		if self.engine.hoist_length < 20:
-			reward += -1
-
-		return reward
-
 	# def get_reward(self):
-	# 	"""this is for exp 26"""
+	# 	"""this is for exp25"""
+	#
+	# 	hook_position = self.state[0]
+	# 	theta = self.state[1]
+	# 	vel = self.state[3]
 	# 	reward = 0
 	#
-	# 	min_distance = min(np.abs(self.state[9] - self.state[5]), np.abs(self.state[11] - self.state[5]))
+	# 	# if np.abs(theta) < 5 and np.abs(vel) < 2:
+	# 	# 	reward = min(1/(np.abs(vel)), 5) # exp 25.1
+	# 	#   reward = 1 # exp 25
 	#
-	# 	if not self.is_terminal():
-	# 		reward += 0
+	# 	if np.abs(theta) < 1 and np.abs(vel) < 1: # exp 25.2
+	# 		reward = 1
 	#
-	# 	else:
-	# 		reward += -self.engine.max_impact / 50
+	# 	if np.abs(hook_position) > 5:
+	# 		reward += 5 - np.abs(hook_position)
 	#
-	# 		if (np.abs(self.state[12] - self.state[6]) < 0.3 and np.abs(self.state[10] - self.state[
-	# 			6]) < 0.3):
-	# 			print(self.engine.max_impact, min_distance, self.engine.load.local_to_world(self.engine.poi)[0])
-	# 			if min_distance < 5:
-	# 				reward += min(200, 10 / min_distance)
-	# 			else:
-	# 				reward += -5
-	#
-	# 		if np.abs(self.state[0])>20:
-	# 			print(self.engine.max_impact, min_distance, self.engine.load.local_to_world(self.engine.poi)[0])
-	# 			reward += -5
+	# 	if self.engine.hoist_length < 20:
+	# 		reward += -1
 	#
 	# 	return reward
 
-	def is_terminal(self):
-		"""this is for exp 25"""
-		hook_position = self.state[0]
-		theta = self.state[1]
-		vel = self.state[3]
-		is_terminal = False
-		# if self.tol_steps == 2000 or np.abs(hook_position[0]) > 50: # 25 and 25.1
-		state = np.abs(theta) < 1 and np.abs(vel) < 1
-		if self.tol_steps == 1500 or np.abs(hook_position) > 15 or self.engine.hoist_length < 10 or self.engine.is_done:
-			is_terminal = True
-		return is_terminal
+	def get_reward(self):
+		"""this is for exp 26"""
+		reward = 0
 
+		min_distance = self.state[5] - self.state[11]
+
+		height = np.abs(self.state[12] - self.state[6])
+
+		# if 0 < min_distance < 2 and self.state[3] < 1 and self.state[1] < 1 and height < 10:
+		# 	reward += self.state[12]/100
+			# reward += 1
+		# else:
+		# 	reward -= 0.1
+		# if self.is_terminal():
+		# 	print(min_distance, height)
+		# 	if self.engine.is_done:
+		# 		reward += min(200, 10 / min_distance)
+
+		if not self.is_terminal():
+			reward += 0
+
+		elif self.engine.max_impact != 0:
+			if (np.abs(self.state[12] - self.state[6]) < 0.3 and np.abs(self.state[10] - self.state[
+				6]) < 0.3):# contact decker
+				reward += self.engine.max_impact / 50
+				print(self.engine.max_impact, min_distance, self.engine.load.local_to_world(self.engine.poi)[0])
+				# if min_distance < 2:
+				# 	reward += min(200, 50 / min_distance)
+
+		# if np.abs(self.state[0])>20:
+		#  	print(self.engine.max_impact, min_distance, self.engine.load.local_to_world(self.engine.poi)[0])
+		#  	reward += -5
+
+		return reward
 
 	# def is_terminal(self):
-	# 	"""this is for exp 26"""
+	# 	"""this is for exp 25"""
+	# 	hook_position = self.state[0]
+	# 	theta = self.state[1]
+	# 	vel = self.state[3]
 	# 	is_terminal = False
-	# 	if self.tol_steps == 1500 or self.engine.is_done or np.abs(self.state[0]) > 20:
+	# 	# if self.tol_steps == 2000 or np.abs(hook_position[0]) > 50: # 25 and 25.1
+	# 	state = np.abs(theta) < 1 and np.abs(vel) < 1
+	# 	if self.tol_steps == 1500 or np.abs(hook_position) > 15 or self.engine.hoist_length < 10 or self.engine.is_done:
 	# 		is_terminal = True
 	# 	return is_terminal
+
+	def is_terminal(self):
+		"""this is for exp 26"""
+		is_terminal = False
+		if self.tol_steps == 1500 or self.engine.is_done or np.abs(self.state[0]) > 20 or self.engine.max_impact!=0:
+			is_terminal = True
+		return is_terminal
 
 	def seed(self, seed=None):
 		self.np_random, seed = seeding.np_random(seed)
@@ -158,7 +167,7 @@ class SetDown_2d_gym(Env):
 
 	def step(self, action):
 
-		# this is for exp 25
+		## this is for exp 25
 		# if action == 0:
 		# 	key = 'left'
 		# elif action == 1:
@@ -167,16 +176,30 @@ class SetDown_2d_gym(Env):
 		# 	key = 'right'
 
 		# for exp 26 and 25.3
+		# if action == 0:
+		# 	key = 'hold'
+		# elif action == 1:
+		# 	key = 'right'
+		# elif action == 2:
+		# 	key = 'left'
+		# elif action == 3:
+		# 	key = 'down'
+		# else:
+		# 	key = 'up'
+
+
+		# for dagger on 25.2.2 and exp 26.4
 		if action == 0:
-			key = 'hold'
-		elif action == 1:
-			key = 'right'
-		elif action == 2:
 			key = 'left'
+		elif action == 1:
+			key = 'hold'
+		elif action == 2:
+			key = 'right'
 		elif action == 3:
 			key = 'down'
 		else:
 			key = 'up'
+
 
 		self.t_simulation = self.rtf * pygame.time.get_ticks() / 1000 # convert to seconds
 		self.t_simulation -= self.sim_start

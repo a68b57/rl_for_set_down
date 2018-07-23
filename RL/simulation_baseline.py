@@ -23,9 +23,11 @@ from baselines.ppo2 import ppo2
 from baselines.ppo2.policies import MlpPolicy
 
 
-ENV_NAME = 'SetDown-v2'
+ENV_NAME = 'SetDown-v3'
 
-def train(env_id, num_timesteps, seed):
+
+
+def train(env_id, total_timesteps, seed, test = True):
 	ncpu = 1
 	config = tf.ConfigProto(allow_soft_placement=True,
 							intra_op_parallelism_threads=ncpu,
@@ -38,23 +40,38 @@ def train(env_id, num_timesteps, seed):
 		return env
 
 	env = DummyVecEnv([make_env])
-
 	set_global_seeds(seed)
 	policy = MlpPolicy
-	model = ppo2.learn(policy=policy, env=env, nsteps=2048, nminibatches=32,
-					   lam=0.95, gamma=0.99, noptepochs=10, log_interval=1,
-					   ent_coef=0.0,
-					   lr=3e-4,
-					   cliprange=0.2,
-					   total_timesteps=num_timesteps)
 
+	if not test:
+
+		model = ppo2.learn(policy=policy, env=env, nsteps=1500, nminibatches=10,
+						   lam=0.95, gamma=0.99, noptepochs=10, log_interval=1,
+						   ent_coef=0.0,
+						   lr=3e-5,
+						   cliprange=0.2,
+						   total_timesteps=total_timesteps, save_interval=200,
+						   load_path='/home/michael/Desktop/workspace/rl_for_set_down/RL/model/PPO/26.4.2.3/checkpoints'
+						             '/00800')
+
+	else:
+		model = ppo2.Model(policy=policy, ob_space=env.observation_space, ac_space=env.action_space,
+		                   nbatch_act=env.num_envs, nbatch_train=env.num_envs*2048,
+                    nsteps=2048, ent_coef=0.0, vf_coef=0.5,
+                    max_grad_norm=0.5)
+		model.load('/home/michael/Desktop/workspace/rl_for_set_down/RL/model/PPO/26.4.2/checkpoints/01400')
+
+		runner = ppo2.Runner(env=env, model=model, nsteps=1501, gamma=0.99, lam=0.95)
+		for i in range(100):
+			obs, returns, masks, actions, values, neglogpacs, states, epinfos = runner.run()
+			print(epinfos[0]['r'])
 
 	return model, env
 
 
 def main():
 	logger.configure()
-	model, env = train(ENV_NAME, num_timesteps=1500000, seed=0)
+	model, env = train(ENV_NAME, total_timesteps=3000000, seed=0, test=False)
 
 	# if args.play:
 	# 	logger.log("Running trained model")
@@ -64,7 +81,6 @@ def main():
 	# 		actions = model.step(obs)[0]
 	# 		obs[:]  = env.step(actions)[0]
 	# 		env.render()
-
 
 if __name__ == '__main__':
 	main()

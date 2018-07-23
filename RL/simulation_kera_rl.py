@@ -27,7 +27,7 @@ log_dir = './log/exp22/'
 
 memory_dir = './memory/'
 
-exp_name = '25.3.2'
+exp_name = '26.4.2'
 
 WINDOW_LENGTH = 1
 
@@ -43,8 +43,9 @@ if __name__ == "__main__":
 	model.add(Flatten(input_shape=input_shape))
 	model.add(Dense(200))
 	model.add(Activation('sigmoid'))
-	model.add(Dense(nb_actions))
-	model.add(Activation('linear'))
+	# model.add(Dense(64))
+	# model.add(Activation('relu'))
+	model.add(Dense(nb_actions, activation='linear'))
 	print(model.summary())
 
 
@@ -66,8 +67,8 @@ if __name__ == "__main__":
 
 	# memory.deq_to_per(memory_expert_pickle)
 
-	policy = LinearAnnealedPolicy(EpsGreedyQPolicy(), attr='eps', value_max=1, value_min=0.1, value_test=0,
-	                              nb_steps=500000)
+	policy = LinearAnnealedPolicy(EpsGreedyQPolicy(), attr='eps', value_max=1, value_min=0.01, value_test=0,
+	                              nb_steps=700000)
 
 	dqn = DQNAgent(model=model, nb_actions=nb_actions, memory=memory, memory_expert=None, nb_steps_warmup=10,
 	               target_model_update=10000, policy=policy, enable_dueling_network=False, enable_double_dqn=True,
@@ -81,7 +82,7 @@ if __name__ == "__main__":
 
 	# dqn.load_weights(model_dir + 'following_'+'25.3.2'+'_weights_400000.h5f')
 
-	# dqn.load_weights('/home/michael/Desktop/workspace/rl_for_set_down/RL/model/dagger/exp2.h5')
+	# dqn.load_weights('./model/dagger/behavior_cloning_on_25.2.2_full_states.h5')
 
 	weights_filename = model_dir + 'following_{}_weights.h5f'.format(exp_name)
 	checkpoint_weights_filename = model_dir + 'following_' + exp_name + '_weights_{step}.h5f'

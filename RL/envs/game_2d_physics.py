@@ -57,24 +57,42 @@ class game2d(object):
 		self.has_bumper_contact = False
 		self.setdown_counter = 0
 		self.is_done = False
-
 		self.time_lookup_index = 0
 		self.max_impact = 0
 
+		self.theta = 0
+		self.poi_vx = 0
+		self.min_distance = 0
 
-	## Collision handler
+
+	# Collision handler
 	def barge_contact(self, arbiter, space, data):
 		self.barge_impulse.append(arbiter._get_total_impulse())
 		if np.max(np.abs(arbiter._get_total_impulse())) > self.max_impact:
 			self.max_impact = np.max(np.abs(arbiter._get_total_impulse()))
 		self.has_barge_contact = True
 
-
 	def bumper_contact(self, arbiter, space, data):
 		self.bumper_impulse.append(arbiter._get_total_impulse())
-		if np.max(np.abs(arbiter._get_total_impulse())) > self.max_impact:
-			self.max_impact = np.max(np.abs(arbiter._get_total_impulse()))
+		# if np.max(np.abs(arbiter._get_total_impulse())) > self.max_impact:
+		# 	self.max_impact = np.max(np.abs(arbiter._get_total_impulse()))
 		self.has_bumper_contact = True
+
+	def update_instant_geometry(self, global_poi_position):
+		x = (global_poi_position[0] - self.hook.local_to_world((0, 0))[0])
+		y = -(global_poi_position[1] - self.hook.local_to_world((0, 0))[1])
+		theta = np.rad2deg(np.arctan2(y, x)) + 90
+		vel = self.load.velocity[0]
+
+		bumper_position_lower = self.barge.local_to_world(self.bumper_lower)
+
+		load_position_lower_right = self.load.local_to_world(self.load_lower_right)
+
+		min_distance = bumper_position_lower[0] - load_position_lower_right[0]
+
+		self.theta = np.abs(theta)
+		self.poi_vx = np.abs(vel)
+		self.min_distance = min_distance
 
 	def prep_new_run(self):
 		""""resets the engine to a new game"""
@@ -117,9 +135,23 @@ class game2d(object):
 		load_bottom_shape.friction = self.friction
 		self.space.add(load_bottom_shape)
 
+
+		# Load contact shape left side
+		load_left_shape = pymunk.Segment(self.load, self.load_lower_left, self.load_upper_left, 0)
+		load_left_shape.collision_type = 2
+		load_left_shape.friction = self.friction
+		self.space.add(load_left_shape)
+
+		# Load contact shape right side
+		load_right_shape = pymunk.Segment(self.load, self.load_lower_right, self.load_upper_right, 0)
+		load_right_shape.collision_type = 2
+		load_right_shape.friction = self.friction
+		self.space.add(load_right_shape)
+
+		initial_bumper_x = np.random.uniform(5,7) * np.random.choice([-1, 1])
 		# Guide contact shape
-		self.bumper_lower = Vec2d(10, -4)
-		self.bumper_upper = Vec2d(10, -10)
+		self.bumper_lower = Vec2d(initial_bumper_x, -4)
+		self.bumper_upper = Vec2d(initial_bumper_x, -10)
 		bumper = pymunk.Segment(self.barge, [self.bumper_lower[0] + 2, self.bumper_lower[1]],
 		                        [self.bumper_upper[0] + 2, self.bumper_upper[1]], 2)
 		bumper.collision_type = 3
@@ -164,7 +196,7 @@ class game2d(object):
 		# self.motions_302_pitch = np.zeros((10000,))
 
 
-		self.hoist_length = 50
+		self.hoist_length =50
 		self.crane_sway = 0
 		self.barge_impulse = []
 		self.bumper_impulse = []
@@ -173,7 +205,7 @@ class game2d(object):
 
 		self.is_done = False
 
-		initial_x = np.random.uniform(10, 15) * np.random.choice([-1, 1])
+		initial_x = np.random.uniform(5, 10) * np.random.choice([-1, 1])
 		self.load.position = Vec2d(initial_x, self.hoist_length - self.poi[1])
 		self.time_lookup_index = 0
 
@@ -252,23 +284,12 @@ class game2d(object):
 			t = t_simulation + i * dt_physics
 
 			(crane_x, crane_y, barge_x, barge_y, barge_rotation) = self.get_external_movements(t)
-			# crane_x = np.interp(t, self.motions_t, self.motions_sway_block)
-			# crane_y = np.interp(t, self.motions_t, self.motions_heave_block)
 
 			self.hook.position = Vec2d(crane_x + self.crane_sway, crane_y)  # motions are already scaled
-
-			# apply barge motions
-			# barge_x = np.interp(t, self.motions_t, self.motions_302_surge)
-			# barge_y = np.interp(t, self.motions_t, self.motions_302_heave) + self.water_level
-			# barge_rotation = np.interp(t, self.motions_t, self.motions_302_pitch)
 
 			self.barge.position = (barge_x, barge_y)
 			self.barge.angle = np.deg2rad(barge_rotation)
 
-			# cable runs between
-			# hoist_position
-			# and
-			#
 			c = self.hook.local_to_world((0, 0)) - self.load.local_to_world(self.poi)
 
 			actual_length = c.length
@@ -284,6 +305,8 @@ class game2d(object):
 			global_poi_position = self.load.local_to_world(self.poi)
 			self.load.apply_force_at_world_point(force, global_poi_position)
 
+			self.update_instant_geometry(global_poi_position)
+
 
 			# Time-stepping and damping
 			self.has_barge_contact = False
@@ -298,7 +321,7 @@ class game2d(object):
 				if self.setdown_counter > ((self.time_in_position_till_end / dt) * self.n_inner):
 					# print('Ready')
 					self.is_done = True
-					# break
+					break
 
 			else:
 				self.setdown_counter -= 1
