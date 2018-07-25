@@ -59,6 +59,9 @@ class game2d(object):
 		self.is_done = False
 		self.time_lookup_index = 0
 		self.max_impact = 0
+		self.current_bumper_contact = 0
+
+
 
 		self.theta = 0
 		self.poi_vx = 0
@@ -77,6 +80,8 @@ class game2d(object):
 		# if np.max(np.abs(arbiter._get_total_impulse())) > self.max_impact:
 		# 	self.max_impact = np.max(np.abs(arbiter._get_total_impulse()))
 		self.has_bumper_contact = True
+		if np.max(np.abs(self.bumper_impulse[-1])) > 200:
+			self.current_bumper_contact = True
 
 	def update_instant_geometry(self, global_poi_position):
 		x = (global_poi_position[0] - self.hook.local_to_world((0, 0))[0])
@@ -96,6 +101,13 @@ class game2d(object):
 
 	def prep_new_run(self):
 		""""resets the engine to a new game"""
+
+		initial_load_x = np.random.uniform(5, 10) * np.random.choice([-1, 1])
+		# initial_load_x = 0
+		initial_bumper_x = np.random.uniform(5, 7) * np.random.choice([-1, 1])
+		# initial_bumper_x = 6
+		initial_hoist_len = 50
+
 
 		# Make world
 		self.space = pymunk.Space()
@@ -148,7 +160,6 @@ class game2d(object):
 		load_right_shape.friction = self.friction
 		self.space.add(load_right_shape)
 
-		initial_bumper_x = np.random.uniform(5,7) * np.random.choice([-1, 1])
 		# Guide contact shape
 		self.bumper_lower = Vec2d(initial_bumper_x, -4)
 		self.bumper_upper = Vec2d(initial_bumper_x, -10)
@@ -196,17 +207,18 @@ class game2d(object):
 		# self.motions_302_pitch = np.zeros((10000,))
 
 
-		self.hoist_length =50
+		self.hoist_length =initial_hoist_len
 		self.crane_sway = 0
 		self.barge_impulse = []
 		self.bumper_impulse = []
 		self.has_barge_contact = False
+		self.has_bumper_contact = False
+
 		self.setdown_counter = 0
 
 		self.is_done = False
 
-		initial_x = np.random.uniform(5, 10) * np.random.choice([-1, 1])
-		self.load.position = Vec2d(initial_x, self.hoist_length - self.poi[1])
+		self.load.position = Vec2d(initial_load_x, self.hoist_length - self.poi[1])
 		self.time_lookup_index = 0
 
 		self.max_impact = 0
@@ -265,6 +277,8 @@ class game2d(object):
 	def step(self, t_simulation, dt, action):
 
 		dt_physics = dt / self.n_inner
+
+		self.current_bumper_contact = False
 
 		for i in range(self.n_inner):
 

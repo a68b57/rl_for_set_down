@@ -65,13 +65,14 @@ class SetDown_2d_gym(Env):
 		"""this is for exp 26"""
 		reward = 0
 
-		min_distance = self.state[5] - self.state[11]
-
+		min_distance = self.engine.min_distance
 		height = np.abs(self.state[12] - self.state[6])
 
-		# if 0 < min_distance < 2 and self.state[3] < 1 and self.state[1] < 1 and height < 10:
+		drop = self.state[12] - self.state[8]
+
+		# if 0 < min_distance < 2 and self.state[3] < 1 and self.state[1] < 1 and height < 5:
 		# 	reward += self.state[12]/100
-			# reward += 1
+			## reward += 1
 		# else:
 		# 	reward -= 0.1
 		# if self.is_terminal():
@@ -79,22 +80,23 @@ class SetDown_2d_gym(Env):
 		# 	if self.engine.is_done:
 		# 		reward += min(200, 10 / min_distance)
 
-		if not self.is_terminal():
-			reward += 0
+		done = self.is_terminal()
 
-		elif self.engine.max_impact != 0:
-			if (np.abs(self.state[12] - self.state[6]) < 0.3 and np.abs(self.state[10] - self.state[
-				6]) < 0.3):# contact decker
-				reward += self.engine.max_impact / 50
-				print(self.engine.max_impact, min_distance, self.engine.load.local_to_world(self.engine.poi)[0])
-				# if min_distance < 2:
-				# 	reward += min(200, 50 / min_distance)
+		reward = 0
+		if not done:
+			if 0 < min_distance < 2 and self.state[3] < 1 and self.state[1] < 1 and drop > 3:
+				# reward += self.state[12]/100
+				reward += 1
 
-		# if np.abs(self.state[0])>20:
-		#  	print(self.engine.max_impact, min_distance, self.engine.load.local_to_world(self.engine.poi)[0])
-		#  	reward += -5
+			if self.engine.has_barge_contact:
+				reward -= 100
+			# 	print('bump contact')
+		#
+		# elif self.engine.max_impact != 0:
+		# 	if 0 < min_distance < 2.5:
+		# 		reward += np.power(20000/self.engine.max_impact, 2)
 
-		return reward
+		return reward, done
 
 	# def is_terminal(self):
 	# 	"""this is for exp 25"""
@@ -111,8 +113,12 @@ class SetDown_2d_gym(Env):
 	def is_terminal(self):
 		"""this is for exp 26"""
 		is_terminal = False
-		if self.tol_steps == 1500 or self.engine.is_done or np.abs(self.state[0]) > 20 or self.engine.max_impact!=0:
+		if self.tol_steps+1 == 1500 or self.engine.is_done or np.abs(self.state[0]) > 20 or self.engine.has_barge_contact:
 			is_terminal = True
+			# valid = np.abs(self.state[12] - self.state[6]) < 0.2 and np.abs(self.state[10] - self.state[
+			# 		6]) < 0.2 and 0 < self.engine.min_distance < 2.5
+			# print(self.engine.max_impact, self.engine.min_distance, np.abs(self.state[12] - self.state[6]),
+			#       self.tol_steps+1, valid)
 		return is_terminal
 
 	def seed(self, seed=None):
@@ -122,7 +128,7 @@ class SetDown_2d_gym(Env):
 	def reset(self):
 
 		self.engine.prep_new_run()
-		self. engine.is_done = False
+		self.engine.is_done = False
 
 		self.sim_start = self.rtf * pygame.time.get_ticks() / 1000
 
@@ -239,8 +245,7 @@ class SetDown_2d_gym(Env):
 		self.state[11] = load_position_lower_right[0] # x load lower right
 		self.state[12] = load_position_lower_right[1] # y load lower right
 
-		reward = self.get_reward()
-		done = self.is_terminal()
+		reward, done = self.get_reward()
 
 		self.tol_steps += 1
 

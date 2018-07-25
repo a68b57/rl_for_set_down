@@ -28,10 +28,12 @@ ENV_NAME = 'SetDown-v3'
 
 
 def train(env_id, total_timesteps, seed, test = True):
-	ncpu = 1
+	ncpu = 8
 	config = tf.ConfigProto(allow_soft_placement=True,
 							intra_op_parallelism_threads=ncpu,
 							inter_op_parallelism_threads=ncpu)
+
+	config.gpu_options.allow_growth = True #pylint: disable=E1101
 	tf.Session(config=config).__enter__()
 
 	def make_env():
@@ -39,20 +41,25 @@ def train(env_id, total_timesteps, seed, test = True):
 		env = bench.Monitor(env, logger.get_dir(), allow_early_resets=True)
 		return env
 
-	env = DummyVecEnv([make_env])
+	env = DummyVecEnv([make_env, make_env, make_env])
 	set_global_seeds(seed)
 	policy = MlpPolicy
 
 	if not test:
-
+		"""
+		n_steps: number of time steps every actor runs for collecting data 
+		nminibatch: batch size
+		noptepochs: num of epochs
+		total_timesteps:
+		"""
 		model = ppo2.learn(policy=policy, env=env, nsteps=1500, nminibatches=10,
 						   lam=0.95, gamma=0.99, noptepochs=10, log_interval=1,
 						   ent_coef=0.0,
-						   lr=3e-5,
+						   lr=3e-6,
 						   cliprange=0.2,
-						   total_timesteps=total_timesteps, save_interval=200,
-						   load_path='/home/michael/Desktop/workspace/rl_for_set_down/RL/model/PPO/26.4.2.3/checkpoints'
-						             '/00800')
+						   total_timesteps=total_timesteps, save_interval=100,
+						   load_path='/home/michael/Desktop/workspace/rl_for_set_down/RL/model/PPO/26.4.2.5/checkpoints'
+						             '/00600')
 
 	else:
 		model = ppo2.Model(policy=policy, ob_space=env.observation_space, ac_space=env.action_space,
