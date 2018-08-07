@@ -4,6 +4,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 from mpl_toolkits.axes_grid1 import host_subplot
 import mpl_toolkits.axisartist as AA
+import json
+import matplotlib.patches as mpatches
 
 
 # sns.set(color_codes=True)
@@ -58,92 +60,163 @@ sns.set(style="darkgrid")
 # d1 = np.array([])
 # d2 = np.array([])
 # d3 = np.array([])
+# d4 = np.array([])
 #
-# sns.kdeplot(d1, label='end-end', shade=True)
-# sns.kdeplot(d2, label='hrl', shade=True, color='g')
-# sns.kdeplot(d3, label='transfer learning', shade=True, color='r')
+# sns.kdeplot(d1, label='Agent_4.5/60', shade=True)
+# sns.kdeplot(d2, label='Agent_9/60', shade=True, color='g')
+# sns.kdeplot(d3, label='Agent_2_speeds', shade=True, color='r')
+# sns.kdeplot(d4, label='Monkey', shade=True, color='orange')
 #
 # # label = 'mean:{:.4f}, std:{:.4f}'.format(np.mean(d1), np.std(d1))
 # # sns.kdeplot(d1, label=label, shade=True)
 #
-# plt.xlim(-0.05,0.6)
-# plt.xlabel('impact velocity (m/s)')
-# plt.title('Hs:1.5, Tp:15, set-down from 7m')
+# plt.xlim(0,1)
+# plt.xlabel('impact velocity(m/s)')
+# plt.title('Distribution of impact velocity')
 # plt.show()
 ###################################################
 
-######show tsplot###########
-window = 100
+########### count plots ############
 
 
-def running_mean(x, N):
-    cumsum = np.cumsum(np.insert(x, 0, 0))
-    return (cumsum[N:] - cumsum[:-N]) / float(N)
+# data = pd.read_csv('exp_one_step.csv')
+#
+# data['integral_reimpact'] = pd.cut(data['reward'], bins=[g for g in range(-100, 10, 10)],right=False,
+#                                 precision=0, include_lowest=True)
+#
+#
+#
+# ax = sns.countplot(x='mode', hue='integral_reimpact', data=data)
+# plt.title('Distribution of integral of reimpact')
+# plt.show()
+#################################
+
+######## correlation plot ###########
+
+# data = pd.read_csv('exp_one_step.csv')
+
+# data = data.loc[(data['mode'] != 'monkey') & data['vel'] > 0]
 
 
-cur1 = pd.read_json('following_26.4.2_log.csv')['episode_reward']
-cur2 = pd.read_json('following_26.4.2_log.csv')['mean_q']
+# g = sns.lmplot(x="step", y="vel", hue="mode",
+#                truncate=True, data=data)
+# g.set_axis_labels("time steps", "imp_vel(m/s)")
+# plt.show()
+####################################
 
-# cur1 = pd.read_json('following_23.1.2.4_log.csv')['episode_reward']
-# cur2 = pd.read_json('following_23.1.2.3_log.csv')['episode_reward']
+######## bar plot　###########
 
-# cur1 = np.array([])
-# cur2 = np.array([])
+data = pd.read_csv('exp_one_step.csv')
 
-cur1 = running_mean(np.array(cur1), window)
-std_cur1 = np.std(cur1)
+data = data.loc[(data['mode'] == 'combined')]
 
-cur2 = running_mean(np.array(cur2), window)
-std_cur2 = np.std(cur2)
-
-l = min(len(cur1),len(cur2))
-C_params = np.linspace(1, l, l)
-cur1 = cur1[0:l]
-cur2 = cur2[0:l]
-
-cur1_min = 0
-cur1_max = 100
-
-cur2_min = -5
-cur2_max = 5
-
-sns.set_style("darkgrid")
+data = data.loc[(data['action'] != 0) & data['vel'] > 0]
 
 
-host = host_subplot(111, axes_class=AA.Axes)
-plt.subplots_adjust(right=0.75)
+# g = sns.lmplot(x="step", y="vel", hue="action",
+#                truncate=False, data=data, legend=['2','3'])
+# g.set_axis_labels("time steps", "imp_vel(m/s)")
 
-par1 = host.twinx()
+action1 = data.query("action == 1")
+action2 = data.query("action == 2")
+labels = []
 
-new_fixed_axis_1 = par1.get_grid_helper().new_fixed_axis
-par1.axis["left"] = new_fixed_axis_1(loc="right",
-                                    axes=par1,
-                                    offset=(0, 0))
+ax = sns.kdeplot(action2['step'], action2['vel'],
+                 cmap="Greens", shade=True, shade_lowest=False, legend=True)
+label_patch1 = mpatches.Patch(color='lightgreen', label='4.5/60')
+labels.append(label_patch1)
+ax = sns.kdeplot(action1['step'], action1['vel'],
+                 cmap="Blues", shade=True, shade_lowest=False, legend=True)
+label_patch2 = mpatches.Patch(color='lightblue', label='9/60')
+labels.append(label_patch2)
 
-par1.axis["left"].toggle(all=True)
 
-
-host.set_ylim(cur1_min, cur1_max)
-host.set_xlabel("episode")
-par1.set_ylabel("mean q")
-host.set_ylabel("reward")
-
-p1, = host.plot(C_params, cur1,label="total episode reward", color='red')
-p2, = par1.plot(C_params, cur2, label="mean q", color='green')
-host.fill_between(C_params, cur1 - std_cur1, cur1 + std_cur1, alpha = 0.1, color="red")
-par1.fill_between(C_params, cur2 - std_cur2, cur2 + std_cur2, alpha = 0.1, color="green")
-par1.set_ylim(cur2_min, cur2_max)
-host.legend()
-
-host.axis["left"].label.set_color(p1.get_color())
-par1.axis["left"].label.set_color(p2.get_color())
-
-host.axis["left"].major_ticklabels.set_color(p1.get_color())
-par1.axis["left"].major_ticklabels.set_color(p2.get_color())
-
-plt.title('Approaching bumper')
-plt.draw()
+ax.legend(handles=labels, loc='upper left')
+plt.title('speed choice by "combined" agent')
 plt.show()
+
+
+############################
+
+
+######show tsplot###########
+# window = 300
+#
+#
+# def running_mean(x, N):
+#     cumsum = np.cumsum(np.insert(x, 0, 0))
+#     return (cumsum[N:] - cumsum[:-N]) / float(N)
+#
+# import json
+#
+# with open('following_24.15.3_log.csv') as f:
+#    data = json.load(f)
+#
+# data = pd.DataFrame(data)
+#
+# cur1 = data['nb_episode_steps']
+# cur2 = data['episode_reward']
+#
+# # cur1 = pd.read_json('following_23.1.2.4_log.csv')['episode_reward']
+# # cur2 = pd.read_json('following_23.1.2.3_log.csv')['episode_reward']
+#
+# # cur1 = np.array([])
+# # cur2 = np.array([])
+#
+# cur1 = running_mean(np.array(cur1), window)
+# std_cur1 = np.std(cur1)
+#
+# cur2 = running_mean(np.array(cur2), window)
+# std_cur2 = np.std(cur2)
+#
+# l = min(len(cur1),len(cur2))
+# C_params = np.linspace(1, l, l)
+# cur1 = cur1[0:l]
+# cur2 = cur2[0:l]
+#
+# cur1_min = 0
+# cur1_max = 100
+#
+# cur2_min = 0
+# cur2_max = 100
+#
+# sns.set_style("darkgrid")
+#
+#
+# host = host_subplot(111, axes_class=AA.Axes)
+# plt.subplots_adjust(right=0.75)
+#
+# par1 = host.twinx()
+#
+# new_fixed_axis_1 = par1.get_grid_helper().new_fixed_axis
+# par1.axis["left"] = new_fixed_axis_1(loc="right",
+#                                     axes=par1,
+#                                     offset=(0, 0))
+#
+# par1.axis["left"].toggle(all=True)
+#
+#
+# host.set_ylim(cur1_min, cur1_max)
+# host.set_xlabel("episode")
+# par1.set_ylabel("episode_len")
+# host.set_ylabel("reward")
+#
+# p1, = host.plot(C_params, cur1,label="episode length", color='red')
+# p2, = par1.plot(C_params, cur2, label="reward", color='green')
+# host.fill_between(C_params, cur1 - std_cur1, cur1 + std_cur1, alpha = 0.1, color="red")
+# par1.fill_between(C_params, cur2 - std_cur2, cur2 + std_cur2, alpha = 0.1, color="green")
+# par1.set_ylim(cur2_min, cur2_max)
+# host.legend()
+#
+# host.axis["left"].label.set_color(p1.get_color())
+# par1.axis["left"].label.set_color(p2.get_color())
+#
+# host.axis["left"].major_ticklabels.set_color(p1.get_color())
+# par1.axis["left"].major_ticklabels.set_color(p2.get_color())
+#
+# # plt.title('Approaching bumper')
+# plt.draw()
+# plt.show()
 
 
 

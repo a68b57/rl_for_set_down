@@ -19,15 +19,15 @@ from RL.tools import MCTS
 
 # ENV_NAME = 'SetDown-v1'
 # ENV_NAME = 'Following-v1'
-# ENV_NAME = 'SetDown-v2' # 1D
-ENV_NAME = 'SetDown-v3' # 2D
+ENV_NAME = 'SetDown-v2' # 1D
+# ENV_NAME = 'SetDown-v3' #1D
 
 model_dir = './model/exp22/'
 log_dir = './log/exp22/'
 
 memory_dir = './memory/'
 
-exp_name = '26.4.2'
+exp_name = '24.9.2.2'
 
 WINDOW_LENGTH = 1
 
@@ -67,8 +67,8 @@ if __name__ == "__main__":
 
 	# memory.deq_to_per(memory_expert_pickle)
 
-	policy = LinearAnnealedPolicy(EpsGreedyQPolicy(), attr='eps', value_max=1, value_min=0.01, value_test=0,
-	                              nb_steps=700000)
+	policy = LinearAnnealedPolicy(EpsGreedyQPolicy(), attr='eps', value_max=0.05, value_min=0.05, value_test=0,
+	                              nb_steps=200000)
 
 	dqn = DQNAgent(model=model, nb_actions=nb_actions, memory=memory, memory_expert=None, nb_steps_warmup=10,
 	               target_model_update=10000, policy=policy, enable_dueling_network=False, enable_double_dqn=True,
@@ -80,20 +80,18 @@ if __name__ == "__main__":
 		lr /= 4
 	dqn.compile(Adam(lr=lr))
 
-	# dqn.load_weights(model_dir + 'following_'+'25.3.2'+'_weights_400000.h5f')
+	dqn.load_weights(model_dir + 'following_'+'24.9.2.2'+'_weights_700000.h5f')
 
-	# dqn.load_weights('./model/dagger/behavior_cloning_on_25.2.2_full_states.h5')
+	# weights_filename = model_dir + 'following_{}_weights.h5f'.format(exp_name)
+	# checkpoint_weights_filename = model_dir + 'following_' + exp_name + '_weights_{step}.h5f'
+	# log_filename = log_dir + 'following_{}_log.csv'.format(exp_name)
+	# callbacks = [ModelIntervalCheckpoint(checkpoint_weights_filename, interval=100000)]
+	# callbacks += [FileLogger(log_filename, interval=1)]
 
-	weights_filename = model_dir + 'following_{}_weights.h5f'.format(exp_name)
-	checkpoint_weights_filename = model_dir + 'following_' + exp_name + '_weights_{step}.h5f'
-	log_filename = log_dir + 'following_{}_log.csv'.format(exp_name)
-	callbacks = [ModelIntervalCheckpoint(checkpoint_weights_filename, interval=100000)]
-	callbacks += [FileLogger(log_filename, interval=1)]
-
-	dqn.fit(env, nb_steps=1500000, visualize=False, verbose=2, callbacks=callbacks)
+	# dqn.fit(env, nb_steps=1500000, visualize=False, verbose=2, callbacks=callbacks)
 
 	# callbacks = [MemoryIntervalCheckpoint(memory_dir + 'dagger_memory_2(appending_on_24.2_with_MCTS_memory).pickle',
 	#                                       interval=1000)]
 	# dqn.test(env=env, mcts_env=env_MCTS, nb_episodes=2000, visualize=False, callbacks=callbacks)
 
-	dqn.test(env=env, mcts_env=env_MCTS, nb_episodes=500, visualize=False)
+	dqn.test(env=env, mcts_env=None, nb_episodes=500, visualize=False)

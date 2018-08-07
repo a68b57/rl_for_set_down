@@ -5,6 +5,7 @@ import matplotlib.animation as animation
 from gym.utils import seeding
 import spec_tools.spec_tools as st
 import RL.tools.wave_tool as wavetool
+import pickle
 
 
 class SetDown_reimpact_gym(Env):
@@ -14,7 +15,6 @@ class SetDown_reimpact_gym(Env):
 
 		self.init_h_b_ct = 10  # initial distance between crane tip to barge
 		self.init_hoist_len = 7 # initial hoist length of aux block
-		# self.init_hoist_len = 9 # initial hoist length of aux block
 
 		self.cur_limit = None # current limit on distance
 		self.init_limit = self.init_h_b_ct - self.init_hoist_len + 3
@@ -33,11 +33,11 @@ class SetDown_reimpact_gym(Env):
 		# self.initial_waiting_steps = 600  # initial waiting time for using AR
 		self.initial_waiting_steps = 0  # initial waiting time for using AR
 
-		self.pred_len = 15 # agent sees the actual change of distance for 15 second (appr. 2 cycles)
-		# self.pred_len = 5 # agent sees the actual change of distance for 15 second (appr. 2 cycles)
+		# self.pred_len = 15 # agent sees the actual change of distance for 15 second (appr. 2 cycles)
+		self.pred_len = 10 # agent sees the actual change of distance for 15 second (appr. 2 cycles)
 		self.predicting_steps = int(self.pred_len / self.dt)
-		self.num_input_wave_height = 8 # agent also sees the peak (crest and though) of rest 8 cycles
-		# self.num_input_wave_height = 0 # agent also sees the peak (crest and though) of rest 8 cycles
+		# self.num_input_wave_height = 8 # agent also sees the peak (crest and though) of rest 8 cycles
+		self.num_input_wave_height = 0 # agent also sees the peak (crest and though) of rest 8 cycles
 
 		self.num_step = int(np.ceil(self.timeout / self.dt)) + 1 + self.initial_waiting_steps # total steps for the
 		self.reimpact_step = 300
@@ -98,6 +98,16 @@ class SetDown_reimpact_gym(Env):
 		self.final_imp_vel = None
 		self.reimpact = False
 
+		self.no_episode = 0
+
+		# temp: collections of re-impact time traces:
+		# with open('/home/michael/Desktop/workspace/rl_for_set_down/RL/memory/24.9_reimpact_episode_timetrace',
+		#           'rb') as f:
+		# 	self.reimpact_episode_timetrace = pickle.load(f)
+		# self.rel_motion_b_ct = self.reimpact_episode_timetrace[np.random.randint(len(self.reimpact_episode_timetrace))]
+
+
+
 	def seed(self, seed=None):
 		self.np_random, seed = seeding.np_random(seed)
 		return [seed]
@@ -131,11 +141,16 @@ class SetDown_reimpact_gym(Env):
 		self.cur_step += self.initial_waiting_steps
 		self.cur_t += round(self.cur_step * self.dt, 2)
 
-		# generate the time trace of changes of distance between crane tip and barge
-		temp = self.resp.make_time_trace(self.num_step+3000, self.dt)
+		# replay the episode timetrace for 20 times
+		# self.no_episode += 1
+		# if self.no_episode % 1 == 0:
+			# print('change')
+			# generate the time trace of changes of distance between crane tip and barge
+		temp = self.resp.make_time_trace(self.num_step + 3000, self.dt)
 		self.rel_motion_b_ct_t = temp['t']
 		self.rel_motion_b_ct = temp['response'][0]
-
+			# self.rel_motion_b_ct = self.reimpact_episode_timetrace[np.random.randint(len(self.reimpact_episode_timetrace))]
+			# self.no_episode = 0
 
 		pred0 = self.rel_motion_b_ct[self.cur_step:self.cur_step + self.predicting_steps]
 		peaks = self.rel_motion_b_ct[self.cur_step + self.predicting_steps:self.cur_step+self.predicting_steps+1000]
@@ -153,6 +168,12 @@ class SetDown_reimpact_gym(Env):
 		if not self.use_AR:
 			# what is the distance in 2 cycles (15s, 75 steps) if no action
 			self.state[2:self.predicting_steps + 2] = self.cur_d_cb + pred0
+
+
+			# what is the distance in 3s following the current speed
+			# self.state[2:self.predicting_steps + 2] = self.cur_d_cb + pred0 - self.cur_speed*0.2*np.arange(
+			# 	self.predicting_steps)
+
 			# the absolute wave height for the next 8 cycles (8 values) if no action
 			self.state[self.predicting_steps + 2:] = all_wave_heights[0:self.num_input_wave_height]
 
@@ -228,34 +249,39 @@ class SetDown_reimpact_gym(Env):
 		self.reimpact_b_track = yb
 		self.reimpact_c_track = yc
 
-		is_reimpact = ((yb - yc) < 0).any()
-		return is_reimpact
+		reimpact = np.array((yb-yc))
+
+		is_reimpact = (reimpact < 0).any()
+		neg_reimpact = reimpact[reimpact < 0]
+		return is_reimpact, np.sum(neg_reimpact)
+
+		# return is_reimpact, None
 
 	def get_reward(self, gameover):
 		reward = 0
 		if gameover:
-			if self.cur_step < self.num_step and self.cur_d_cb < 0: # set-down
+
+			self.reimpact, mag_reimpact = self.is_reimpact()
+
+			if self.cur_step < self.num_step and self.cur_d_cb < 0 and not self.reimpact: # set-down
 				vel = (self.prev_d_cb - self.cur_d_cb) / self.dt
 				self.final_imp_vel = vel
 				if 0 < vel < 0.5: # good one
 					reward = min(10 * 1 / vel, 200)
 					self.final_imp_vel = vel
+					# reward = 10
 
-				else: # bad one
-					reward = -30
 
-					# reward = max(-200*(vel-0.5), -99)
+			# else: # bad one
+				# 	reward += -30
 
 			if self.cur_d_cb > self.cur_limit: # hit boundary
-				reward = -20
-
-			self.reimpact = self.is_reimpact()
-
-
+				reward += -20
 
 			if self.reimpact:
-				reward = -100
-
+				# reward = -100
+				reward += 10*mag_reimpact
+				# self.reimpact_episode_timetrace.append(self.rel_motion_b_ct)
 		self.sum_reward += reward
 
 		return reward
@@ -341,7 +367,12 @@ class SetDown_reimpact_gym(Env):
 		self.state[1] = self.cur_speed
 
 		self.state[2:self.predicting_steps + 2] = self.cur_d_cb - pred
-		self.state[self.predicting_steps + 2:] = wave_heights[0:self.num_input_wave_height]
+
+		# what is the distance in 3s following the current speed
+		self.state[2:self.predicting_steps + 2] = self.cur_d_cb + (pred - self.rel_motion_b_ct[self.cur_step-1])\
+		                                          - self.cur_speed * 0.2 * np.arange(self.predicting_steps)
+
+		# self.state[self.predicting_steps + 2:] = wave_heights[0:self.num_input_wave_height]
 
 		done = self.if_gameover()
 		reward = self.get_reward(done)

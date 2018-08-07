@@ -39,3 +39,14 @@ register(
     id='SetDown-v3',
     entry_point='RL.envs:SetDown_2d_gym',
 )
+
+register(
+    id='SetDown-v4',
+    entry_point='RL.envs:SetDown_hmc_insite',
+)
+
+
+register(
+	id='SetDown-v5',
+	entry_point='RL.envs:SetDown_reimpact_one_step',
+)

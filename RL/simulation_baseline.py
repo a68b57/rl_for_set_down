@@ -10,20 +10,40 @@ from baselines import deepq
 from baselines.deepq.replay_buffer import ReplayBuffer, PrioritizedReplayBuffer
 from baselines.deepq.utils import ObservationInput
 from baselines.common.schedules import LinearSchedule
+from baselines.common.vec_env.subproc_vec_env import SubprocVecEnv
 
 import RL
 
 
 from baselines import bench, logger
-
+from baselines.bench import Monitor
 from baselines.common import set_global_seeds
 from baselines.common.vec_env.vec_normalize import VecNormalize
 from baselines.common.vec_env.dummy_vec_env import DummyVecEnv
 from baselines.ppo2 import ppo2
 from baselines.ppo2.policies import MlpPolicy
 
+from gym import spaces
 
-ENV_NAME = 'SetDown-v3'
+import os
+
+ENV_NAME = 'SetDown-v2'
+
+
+
+def make_multi_env(env_id, num_env, seed, wrapper_kwargs=None, start_index=0):
+	if wrapper_kwargs is None: wrapper_kwargs = {}
+
+	def make_env(rank):
+		def _thunk():
+			env = gym.make(env_id)
+			env.seed(seed + rank)
+			if logger.get_dir():
+				env = bench.Monitor(env, os.path.join(logger.get_dir(), 'train-{}.monitor.json'.format(rank)))
+			return env
+		return _thunk
+	set_global_seeds(seed)
+	return SubprocVecEnv([make_env(i+start_index) for i in range(num_env)])
 
 
 
@@ -37,11 +57,14 @@ def train(env_id, total_timesteps, seed, test = True):
 	tf.Session(config=config).__enter__()
 
 	def make_env():
-		env = gym.make(env_id)
+		env = gym.make(ENV_NAME)
 		env = bench.Monitor(env, logger.get_dir(), allow_early_resets=True)
+		env.seed(np.random.randint(0,10))
 		return env
 
-	env = DummyVecEnv([make_env, make_env, make_env])
+	# env = DummyVecEnv([make_env,make_env,make_env,make_env,make_env,make_env,make_env,make_env])
+	#
+	env = make_multi_env(ENV_NAME, 8, seed=10)
 	set_global_seeds(seed)
 	policy = MlpPolicy
 
@@ -52,20 +75,20 @@ def train(env_id, total_timesteps, seed, test = True):
 		noptepochs: num of epochs
 		total_timesteps:
 		"""
-		model = ppo2.learn(policy=policy, env=env, nsteps=1500, nminibatches=10,
-						   lam=0.95, gamma=0.99, noptepochs=10, log_interval=1,
-						   ent_coef=0.0,
-						   lr=3e-6,
+		model = ppo2.learn(policy=policy, env=env, nsteps=128, nminibatches=32*8,
+						   lam=0.95, gamma=0.99, noptepochs=3, log_interval=1,
+						   ent_coef=0.01,
+						   lr=3e-5,
 						   cliprange=0.2,
-						   total_timesteps=total_timesteps, save_interval=100,
-						   load_path='/home/michael/Desktop/workspace/rl_for_set_down/RL/model/PPO/26.4.2.5/checkpoints'
-						             '/00600')
+						   total_timesteps=total_timesteps, save_interval=100)
+						   # load_path='/home/michael/Desktop/workspace/rl_for_set_down/RL/model/PPO/26.4.2.5/checkpoints'
+						   #           '/00600')
 
 	else:
 		model = ppo2.Model(policy=policy, ob_space=env.observation_space, ac_space=env.action_space,
-		                   nbatch_act=env.num_envs, nbatch_train=env.num_envs*2048,
-                    nsteps=2048, ent_coef=0.0, vf_coef=0.5,
-                    max_grad_norm=0.5)
+						   nbatch_act=env.num_envs, nbatch_train=env.num_envs*2048,
+					nsteps=2048, ent_coef=0.0, vf_coef=0.5,
+					max_grad_norm=0.5)
 		model.load('/home/michael/Desktop/workspace/rl_for_set_down/RL/model/PPO/26.4.2/checkpoints/01400')
 
 		runner = ppo2.Runner(env=env, model=model, nsteps=1501, gamma=0.99, lam=0.95)
@@ -78,19 +101,37 @@ def train(env_id, total_timesteps, seed, test = True):
 
 def main():
 	logger.configure()
-	model, env = train(ENV_NAME, total_timesteps=3000000, seed=0, test=False)
+	model, env = train(ENV_NAME, total_timesteps=6000000, seed=0, test=False)
 
-	# if args.play:
-	# 	logger.log("Running trained model")
-	# 	obs = np.zeros((env.num_envs,) + env.observation_space.shape)
-	# 	obs[:] = env.reset()
-	# 	while True:
-	# 		actions = model.step(obs)[0]
-	# 		obs[:]  = env.step(actions)[0]
-	# 		env.render()
+
+def test():
+	ncpu = 1
+	config = tf.ConfigProto(allow_soft_placement=True,
+							intra_op_parallelism_threads=ncpu,
+							inter_op_parallelism_threads=ncpu)
+	tf.Session(config=config).__enter__()
+
+	high_limit = np.inf * np.ones(52)
+	observation_space = spaces.Box(-high_limit, high=high_limit, dtype=np.float16)
+	model = ppo2.Model(policy=MlpPolicy, ob_space=observation_space, ac_space=spaces.Discrete(3),
+					   nbatch_act=1, nbatch_train=1500,
+					   nsteps=150, ent_coef=0.0, vf_coef=0.5,
+					   max_grad_norm=0.5)
+	model.load('/tmp/openai-2018-07-31-15-42-44-088846/checkpoints/00400')
+
+	env = DummyVecEnv([make_env])
+
+	logger.log("Running trained model")
+	obs = np.zeros((env.num_envs,) + env.observation_space.shape)
+	obs[:] = env.reset()
+	while True:
+		actions = model.step(obs)[0]
+		obs[:]  = env.step(actions)[0]
+
 
 if __name__ == '__main__':
 	main()
+	# test()
 
 
 
