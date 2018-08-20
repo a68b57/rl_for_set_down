@@ -102,12 +102,12 @@ class game2d(object):
 	def prep_new_run(self):
 		""""resets the engine to a new game"""
 
-		initial_load_x = np.random.uniform(5, 10) * np.random.choice([-1, 1])
-		# initial_load_x = 0
-		initial_bumper_x = np.random.uniform(5, 7) * np.random.choice([-1, 1])
-		# initial_bumper_x = 6
-		initial_hoist_len = 50
-
+		# initial_load_x = np.random.uniform(10, 15) * np.random.choice([-1, 1])
+		initial_load_x = 0
+		# initial_bumper_x = np.random.uniform(5, 7) * np.random.choice([-1, 1])
+		initial_bumper_x = 5.5
+		# initial_hoist_len = np.random.uniform(50, 60)
+		initial_hoist_len = 60
 
 		# Make world
 		self.space = pymunk.Space()
@@ -199,7 +199,7 @@ class game2d(object):
 		self.motions_302_pitch = R[4] * self.magic_pitch_factor
 
 
-		# # TODO: Temp start with stationary env
+		# TODO: Temp start with stationary env
 		# self.motions_sway_block = np.zeros((10000,))
 		# self.motions_heave_block = np.zeros((10000,))
 		# self.motions_302_surge = np.zeros((10000,))
@@ -331,11 +331,13 @@ class game2d(object):
 
 			# for the game to end we need a minimum period of continuous contact
 			if self.has_barge_contact:
-				self.setdown_counter += 1
-				if self.setdown_counter > ((self.time_in_position_till_end / dt) * self.n_inner):
-					# print('Ready')
-					self.is_done = True
-					break
+				# self.setdown_counter += 1
+				# if self.setdown_counter > ((self.time_in_position_till_end / dt) * self.n_inner):
+				# 	# print('Ready')
+				# 	self.is_done = True
+				# 	break
+				self.is_done = True
+
 
 			else:
 				self.setdown_counter -= 1

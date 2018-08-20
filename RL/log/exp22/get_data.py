@@ -106,117 +106,117 @@ sns.set(style="darkgrid")
 
 ######## bar plot　###########
 
-data = pd.read_csv('exp_one_step.csv')
-
-data = data.loc[(data['mode'] == 'combined')]
-
-data = data.loc[(data['action'] != 0) & data['vel'] > 0]
-
-
-# g = sns.lmplot(x="step", y="vel", hue="action",
-#                truncate=False, data=data, legend=['2','3'])
-# g.set_axis_labels("time steps", "imp_vel(m/s)")
-
-action1 = data.query("action == 1")
-action2 = data.query("action == 2")
-labels = []
-
-ax = sns.kdeplot(action2['step'], action2['vel'],
-                 cmap="Greens", shade=True, shade_lowest=False, legend=True)
-label_patch1 = mpatches.Patch(color='lightgreen', label='4.5/60')
-labels.append(label_patch1)
-ax = sns.kdeplot(action1['step'], action1['vel'],
-                 cmap="Blues", shade=True, shade_lowest=False, legend=True)
-label_patch2 = mpatches.Patch(color='lightblue', label='9/60')
-labels.append(label_patch2)
-
-
-ax.legend(handles=labels, loc='upper left')
-plt.title('speed choice by "combined" agent')
-plt.show()
+# data = pd.read_csv('exp_one_step.csv')
+#
+# data = data.loc[(data['mode'] == 'combined')]
+#
+# data = data.loc[(data['action'] != 0) & data['vel'] > 0]
+#
+#
+# # g = sns.lmplot(x="step", y="vel", hue="action",
+# #                truncate=False, data=data, legend=['2','3'])
+# # g.set_axis_labels("time steps", "imp_vel(m/s)")
+#
+# action1 = data.query("action == 1")
+# action2 = data.query("action == 2")
+# labels = []
+#
+# ax = sns.kdeplot(action2['step'], action2['vel'],
+#                  cmap="Greens", shade=True, shade_lowest=False, legend=True)
+# label_patch1 = mpatches.Patch(color='lightgreen', label='4.5/60')
+# labels.append(label_patch1)
+# ax = sns.kdeplot(action1['step'], action1['vel'],
+#                  cmap="Blues", shade=True, shade_lowest=False, legend=True)
+# label_patch2 = mpatches.Patch(color='lightblue', label='9/60')
+# labels.append(label_patch2)
+#
+#
+# ax.legend(handles=labels, loc='upper left')
+# plt.title('speed choice by "combined" agent')
+# plt.show()
 
 
 ############################
 
 
 ######show tsplot###########
-# window = 300
-#
-#
-# def running_mean(x, N):
-#     cumsum = np.cumsum(np.insert(x, 0, 0))
-#     return (cumsum[N:] - cumsum[:-N]) / float(N)
-#
-# import json
-#
-# with open('following_24.15.3_log.csv') as f:
-#    data = json.load(f)
-#
-# data = pd.DataFrame(data)
-#
-# cur1 = data['nb_episode_steps']
-# cur2 = data['episode_reward']
-#
-# # cur1 = pd.read_json('following_23.1.2.4_log.csv')['episode_reward']
-# # cur2 = pd.read_json('following_23.1.2.3_log.csv')['episode_reward']
-#
-# # cur1 = np.array([])
-# # cur2 = np.array([])
-#
-# cur1 = running_mean(np.array(cur1), window)
-# std_cur1 = np.std(cur1)
-#
-# cur2 = running_mean(np.array(cur2), window)
-# std_cur2 = np.std(cur2)
-#
-# l = min(len(cur1),len(cur2))
-# C_params = np.linspace(1, l, l)
-# cur1 = cur1[0:l]
-# cur2 = cur2[0:l]
-#
-# cur1_min = 0
-# cur1_max = 100
-#
-# cur2_min = 0
-# cur2_max = 100
-#
-# sns.set_style("darkgrid")
-#
-#
-# host = host_subplot(111, axes_class=AA.Axes)
-# plt.subplots_adjust(right=0.75)
-#
-# par1 = host.twinx()
-#
-# new_fixed_axis_1 = par1.get_grid_helper().new_fixed_axis
-# par1.axis["left"] = new_fixed_axis_1(loc="right",
-#                                     axes=par1,
-#                                     offset=(0, 0))
-#
-# par1.axis["left"].toggle(all=True)
-#
-#
-# host.set_ylim(cur1_min, cur1_max)
-# host.set_xlabel("episode")
-# par1.set_ylabel("episode_len")
-# host.set_ylabel("reward")
-#
-# p1, = host.plot(C_params, cur1,label="episode length", color='red')
-# p2, = par1.plot(C_params, cur2, label="reward", color='green')
-# host.fill_between(C_params, cur1 - std_cur1, cur1 + std_cur1, alpha = 0.1, color="red")
-# par1.fill_between(C_params, cur2 - std_cur2, cur2 + std_cur2, alpha = 0.1, color="green")
-# par1.set_ylim(cur2_min, cur2_max)
-# host.legend()
-#
-# host.axis["left"].label.set_color(p1.get_color())
-# par1.axis["left"].label.set_color(p2.get_color())
-#
-# host.axis["left"].major_ticklabels.set_color(p1.get_color())
-# par1.axis["left"].major_ticklabels.set_color(p2.get_color())
-#
-# # plt.title('Approaching bumper')
-# plt.draw()
-# plt.show()
+window = 300
+
+
+def running_mean(x, N):
+    cumsum = np.cumsum(np.insert(x, 0, 0))
+    return (cumsum[N:] - cumsum[:-N]) / float(N)
+
+import json
+
+with open('following_25.2.2_log.csv') as f:
+   data = json.load(f)
+
+data = pd.DataFrame(data)
+
+cur1 = data['mean_q']
+cur2 = data['episode_reward']
+
+# cur1 = pd.read_json('following_23.1.2.4_log.csv')['episode_reward']
+# cur2 = pd.read_json('following_23.1.2.3_log.csv')['episode_reward']
+
+# cur1 = np.array([])
+# cur2 = np.array([])
+
+cur1 = running_mean(np.array(cur1), window)
+std_cur1 = np.std(cur1)
+
+cur2 = running_mean(np.array(cur2), window)
+std_cur2 = np.std(cur2)
+
+l = min(len(cur1),len(cur2))
+C_params = np.linspace(1, l, l)
+cur1 = cur1[0:l]
+cur2 = cur2[0:l]
+
+cur1_min = 0
+cur1_max = 1000
+
+cur2_min = 0
+cur2_max = 1000
+
+sns.set_style("darkgrid")
+
+
+host = host_subplot(111, axes_class=AA.Axes)
+plt.subplots_adjust(right=0.75)
+
+par1 = host.twinx()
+
+new_fixed_axis_1 = par1.get_grid_helper().new_fixed_axis
+par1.axis["left"] = new_fixed_axis_1(loc="right",
+                                    axes=par1,
+                                    offset=(0, 0))
+
+par1.axis["left"].toggle(all=True)
+
+
+host.set_ylim(cur1_min, cur1_max)
+host.set_xlabel("episode")
+par1.set_ylabel("episode_len")
+host.set_ylabel("reward")
+
+p1, = host.plot(C_params, cur1,label="episode length", color='red')
+p2, = par1.plot(C_params, cur2, label="reward", color='green')
+host.fill_between(C_params, cur1 - std_cur1, cur1 + std_cur1, alpha = 0.1, color="red")
+par1.fill_between(C_params, cur2 - std_cur2, cur2 + std_cur2, alpha = 0.1, color="green")
+par1.set_ylim(cur2_min, cur2_max)
+host.legend()
+
+host.axis["left"].label.set_color(p1.get_color())
+par1.axis["left"].label.set_color(p2.get_color())
+
+host.axis["left"].major_ticklabels.set_color(p1.get_color())
+par1.axis["left"].major_ticklabels.set_color(p2.get_color())
+
+# plt.title('Approaching bumper')
+plt.draw()
+plt.show()
 
 
 

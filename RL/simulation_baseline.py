@@ -20,15 +20,15 @@ from baselines.bench import Monitor
 from baselines.common import set_global_seeds
 from baselines.common.vec_env.vec_normalize import VecNormalize
 from baselines.common.vec_env.dummy_vec_env import DummyVecEnv
+from baselines.common.vec_env.vec_frame_stack import VecFrameStack
 from baselines.ppo2 import ppo2
-from baselines.ppo2.policies import MlpPolicy
+from baselines.ppo2.policies import MlpPolicy, LnLstmPolicy, LstmMlpPolicy
 
 from gym import spaces
 
 import os
 
-ENV_NAME = 'SetDown-v2'
-
+ENV_NAME = 'SetDown-v3'
 
 
 def make_multi_env(env_id, num_env, seed, wrapper_kwargs=None, start_index=0):
@@ -46,8 +46,7 @@ def make_multi_env(env_id, num_env, seed, wrapper_kwargs=None, start_index=0):
 	return SubprocVecEnv([make_env(i+start_index) for i in range(num_env)])
 
 
-
-def train(env_id, total_timesteps, seed, test = True):
+def train(env_id, total_timesteps, seed):
 	ncpu = 8
 	config = tf.ConfigProto(allow_soft_placement=True,
 							intra_op_parallelism_threads=ncpu,
@@ -62,46 +61,30 @@ def train(env_id, total_timesteps, seed, test = True):
 		env.seed(np.random.randint(0,10))
 		return env
 
-	# env = DummyVecEnv([make_env,make_env,make_env,make_env,make_env,make_env,make_env,make_env])
-	#
+	env = DummyVecEnv([make_env])
 	env = make_multi_env(ENV_NAME, 8, seed=10)
+	# env = VecFrameStack(env, 10)
+
 	set_global_seeds(seed)
+	# policy = LnLstmPolicy
 	policy = MlpPolicy
+	# policy = LstmMlpPolicy
 
-	if not test:
-		"""
-		n_steps: number of time steps every actor runs for collecting data 
-		nminibatch: batch size
-		noptepochs: num of epochs
-		total_timesteps:
-		"""
-		model = ppo2.learn(policy=policy, env=env, nsteps=128, nminibatches=32*8,
-						   lam=0.95, gamma=0.99, noptepochs=3, log_interval=1,
-						   ent_coef=0.01,
-						   lr=3e-5,
-						   cliprange=0.2,
-						   total_timesteps=total_timesteps, save_interval=100)
-						   # load_path='/home/michael/Desktop/workspace/rl_for_set_down/RL/model/PPO/26.4.2.5/checkpoints'
-						   #           '/00600')
-
-	else:
-		model = ppo2.Model(policy=policy, ob_space=env.observation_space, ac_space=env.action_space,
-						   nbatch_act=env.num_envs, nbatch_train=env.num_envs*2048,
-					nsteps=2048, ent_coef=0.0, vf_coef=0.5,
-					max_grad_norm=0.5)
-		model.load('/home/michael/Desktop/workspace/rl_for_set_down/RL/model/PPO/26.4.2/checkpoints/01400')
-
-		runner = ppo2.Runner(env=env, model=model, nsteps=1501, gamma=0.99, lam=0.95)
-		for i in range(100):
-			obs, returns, masks, actions, values, neglogpacs, states, epinfos = runner.run()
-			print(epinfos[0]['r'])
+	model = ppo2.learn(policy=policy, env=env, nsteps=512, nminibatches=32,
+					   lam=0.95, gamma=0.99, noptepochs=10, log_interval=1,
+					   ent_coef=0.01,
+					   lr=1e-4,
+					   cliprange=0.2,
+					   total_timesteps=total_timesteps, save_interval=50)
+					   # load_path='/home/michael/Desktop/workspace/rl_for_set_down/RL/model/PPO/27.2_PPO/checkpoints'
+					   #           '/01800')
 
 	return model, env
 
 
 def main():
 	logger.configure()
-	model, env = train(ENV_NAME, total_timesteps=6000000, seed=0, test=False)
+	model, env = train(ENV_NAME, total_timesteps=10000000, seed=0)
 
 
 def test():
